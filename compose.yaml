@@ -1,0 +1,12 @@
+# Host the graphitization dashboard for the lab.
+#   docker compose up --build      -> http://localhost:8080
+# Requires DATA/ present locally (the build bakes the real dataset into the page).
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: graphitization-dashboard
+    ports:
+      - "8080:80"
+    restart: unless-stopped

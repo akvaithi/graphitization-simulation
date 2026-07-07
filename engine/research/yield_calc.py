@@ -50,11 +50,16 @@ from run_parser import parse_run_filename
 M_C, M_Fe, M_CaCO3, M_CaO, M_S, M_CaS = 12.011, 55.845, 100.086, 56.077, 32.06, 72.138
 M_CO2, M_CO = 44.009, 28.01
 
-# Placeholder feed compositions (carbon, sulfur mass fractions) by PC grade —
-# literature-typical values. **REPLACE with your own measured proximate/ultimate
-# analysis** (ideally fixed carbon, not total) before quoting an absolute yield.
-DEFAULT_COMPOSITION = {"GPC": (0.88, 0.045), "CPC": (0.97, 0.02), "LSPC": (0.95, 0.007)}
-_FALLBACK_COMPOSITION = (0.88, 0.045)
+# Feed compositions (carbon, sulfur mass fractions) by PC grade.
+# GPC (Green Petroleum Coke) is this project's actual feedstock: measured ~7 wt% S.
+# We use 6.5 wt% here because that is the internally-consistent value — the group
+# calculated 0.4063 g CaCO3 to be the 1:1 molar match to the sulfur in a 2 g PC
+# charge, and 0.4063 g CaCO3 traps exactly 6.5 wt% S (see CLAUDE.md §feedstock).
+# This makes the H1 sulfur-trapping threshold land on the experimental 1:1 point.
+# CPC/LSPC remain literature-typical placeholders. **REPLACE with measured
+# proximate/ultimate analysis (ideally fixed carbon, not total) per feedstock.**
+DEFAULT_COMPOSITION = {"GPC": (0.88, 0.065), "CPC": (0.97, 0.02), "LSPC": (0.95, 0.007)}
+_FALLBACK_COMPOSITION = (0.88, 0.065)
 
 
 def masses_from_name(sample: str, pellet: float) -> dict | None:

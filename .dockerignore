@@ -1,0 +1,15 @@
+# keep the build context small — but DATA/ is intentionally NOT ignored here
+# (the dashboard build bakes it into the page). DATA/ stays gitignored, though.
+.venv/
+.git/
+outputs/
+dashboard/dist/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+tests/
+native/
+windows/
+docs/
+SIMULATION_HANDOFF.md

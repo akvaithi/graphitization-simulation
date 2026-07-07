@@ -1,0 +1,1020 @@
+<title>Catalytic Graphitization Simulator</title>
+<style>
+  :root{
+    --paper: #EDEAE4;
+    --paper-raised: #F6F4EF;
+    --paper-sunken: #E3DFD6;
+    --ink: #201C15;
+    --ink-soft: #55503F;
+    --ink-muted: #8B8575;
+    --line: #D8D3C6;
+    --line-strong: #C3BDAC;
+    --ember: #E4592B;
+    --ember-ink: #A5401D;
+    --ember-soft: #F4DCCE;
+    --steel: #0B76A8;
+    --steel-soft: #D2E7EF;
+    --ochre: #A8672A;
+    --ochre-soft: #EBE0CB;
+    --good: #3F8F5F;
+    --good-soft: #DCEBE0;
+    --warn: #9C7A1F;
+    --warn-soft: #F1E5C4;
+    --critical: #B3392E;
+    --critical-soft: #F3DAD6;
+    --focus: #0B76A8;
+    --shadow: 0 1px 2px rgba(32,28,21,0.06), 0 6px 20px -10px rgba(32,28,21,0.18);
+    --font-display: ui-serif, "New York", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper: #17140F;
+      --paper-raised: #1E1A13;
+      --paper-sunken: #100E0A;
+      --ink: #ECE7DA;
+      --ink-soft: #B6AE99;
+      --ink-muted: #7C7563;
+      --line: #322D22;
+      --line-strong: #443D2C;
+      --ember: #E06A38;
+      --ember-ink: #F3966B;
+      --ember-soft: #3A2418;
+      --steel: #3B93C4;
+      --steel-soft: #17303B;
+      --ochre: #BE7F44;
+      --ochre-soft: #322717;
+      --good: #5CB37D;
+      --good-soft: #1C2E22;
+      --warn: #D9AE47;
+      --warn-soft: #332B15;
+      --critical: #D5645A;
+      --critical-soft: #3A1F1C;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper: #17140F; --paper-raised: #1E1A13; --paper-sunken: #100E0A;
+    --ink: #ECE7DA; --ink-soft: #B6AE99; --ink-muted: #7C7563;
+    --line: #322D22; --line-strong: #443D2C;
+    --ember: #E06A38; --ember-ink: #F3966B; --ember-soft: #3A2418;
+    --steel: #3B93C4; --steel-soft: #17303B;
+    --ochre: #BE7F44; --ochre-soft: #322717;
+    --good: #5CB37D; --good-soft: #1C2E22;
+    --warn: #D9AE47; --warn-soft: #332B15;
+    --critical: #D5645A; --critical-soft: #3A1F1C;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"]{
+    --paper: #EDEAE4; --paper-raised: #F6F4EF; --paper-sunken: #E3DFD6;
+    --ink: #201C15; --ink-soft: #55503F; --ink-muted: #8B8575;
+    --line: #D8D3C6; --line-strong: #C3BDAC;
+    --ember: #E4592B; --ember-ink: #A5401D; --ember-soft: #F4DCCE;
+    --steel: #0B76A8; --steel-soft: #D2E7EF;
+    --ochre: #A8672A; --ochre-soft: #EBE0CB;
+    --good: #3F8F5F; --good-soft: #DCEBE0;
+    --warn: #9C7A1F; --warn-soft: #F1E5C4;
+    --critical: #B3392E; --critical-soft: #F3DAD6;
+    color-scheme: light;
+  }
+
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  ::selection{ background: var(--ember-soft); color: var(--ink); }
+  a{ color: var(--steel); }
+  h1,h2,h3{ font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; color: var(--ink); }
+  .mono{ font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .eyebrow{
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--ink-muted); font-weight: 600;
+  }
+
+  /* ---------- layout shell ---------- */
+  .page{ max-width: 1320px; margin: 0 auto; padding: 28px 28px 80px; }
+  header.masthead{
+    display:flex; flex-direction:column; gap: 14px; padding-bottom: 26px; margin-bottom: 26px;
+    border-bottom: 1px solid var(--line);
+  }
+  header.masthead h1{ font-size: clamp(26px, 3vw, 34px); }
+  header.masthead p.thesis{
+    max-width: 74ch; color: var(--ink-soft); font-size: 15.5px; line-height: 1.6;
+  }
+  header.masthead p.thesis b{ color: var(--ink); font-weight: 600; }
+  .phase-key{ display:flex; gap: 18px; flex-wrap: wrap; align-items:center; font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+  .phase-key .item{ display:flex; align-items:center; gap:7px; }
+  .phase-key .swatch{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+
+  section.block{ margin-top: 46px; }
+  section.block > .block-head{ display:flex; align-items:baseline; justify-content:space-between; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+  section.block > .block-head h2{ font-size: 21px; }
+  section.block > .block-head .desc{ color: var(--ink-muted); font-size: 13px; max-width: 56ch; }
+
+  .card{
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+  .card > .card-title{
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-muted); font-weight: 600; margin-bottom: 4px;
+  }
+  .card > .card-sub{ color: var(--ink-muted); font-size: 12.5px; margin-bottom: 14px; }
+
+  /* ---------- simulator layout ---------- */
+  .sim-grid{ display:grid; grid-template-columns: 268px 1fr; gap: 20px; align-items:start; }
+  @media (max-width: 900px){ .sim-grid{ grid-template-columns: 1fr; } }
+  .rail{ position: sticky; top: 20px; display:flex; flex-direction:column; gap:16px; }
+  @media (max-width: 900px){ .rail{ position: static; } }
+
+  .control{ margin-bottom: 16px; }
+  .control:last-child{ margin-bottom: 0; }
+  .control label{ display:flex; justify-content:space-between; align-items:baseline; font-size: 12.5px; color: var(--ink-soft); margin-bottom: 6px; }
+  .control label .val{ font-family: var(--font-mono); font-size: 13px; color: var(--ink); font-weight: 600; }
+  input[type="range"]{
+    -webkit-appearance:none; appearance:none; width:100%; height: 22px; background: transparent; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-runnable-track{
+    height: 4px; background: var(--line-strong); border-radius: 2px;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:16px; height:16px; border-radius:50%;
+    background: var(--ember); border: 2px solid var(--paper-raised); margin-top: -6px;
+    box-shadow: 0 0 0 1px var(--ember-ink);
+  }
+  input[type="range"]::-moz-range-track{ height:4px; background: var(--line-strong); border-radius:2px; }
+  input[type="range"]::-moz-range-thumb{
+    width:14px; height:14px; border-radius:50%; background: var(--ember); border: 2px solid var(--paper-raised);
+    box-shadow: 0 0 0 1px var(--ember-ink);
+  }
+  input[type="range"]:focus-visible::-webkit-slider-thumb{ outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .toggle-row{ display:flex; align-items:flex-start; gap:10px; padding: 9px 0; border-top: 1px solid var(--line); }
+  .toggle-row:first-of-type{ border-top: none; padding-top: 4px; }
+  .switch{ position:relative; width:34px; height:19px; flex: 0 0 auto; margin-top:1px; }
+  .switch input{ opacity:0; width:100%; height:100%; margin:0; position:absolute; cursor:pointer; z-index:1; }
+  .switch .track{ position:absolute; inset:0; background: var(--line-strong); border-radius: 10px; transition: background .15s ease; }
+  .switch .thumb{ position:absolute; top:2px; left:2px; width:15px; height:15px; border-radius:50%; background: var(--paper-raised); transition: transform .15s ease; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+  .switch input:checked + .track{ background: var(--ember); }
+  .switch input:checked + .track + .thumb{ transform: translateX(15px); }
+  .switch input:focus-visible + .track{ outline: 2px solid var(--focus); outline-offset: 2px; }
+  .toggle-copy .name{ font-size: 13px; font-weight: 600; color: var(--ink); }
+  .toggle-copy .desc{ font-size: 11.5px; color: var(--ink-muted); line-height: 1.4; margin-top: 1px; }
+
+  button.reset-btn{
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.03em; text-transform: uppercase;
+    background: transparent; border: 1px solid var(--line-strong); color: var(--ink-soft);
+    padding: 8px 12px; border-radius: 4px; cursor: pointer; width: 100%;
+  }
+  button.reset-btn:hover{ border-color: var(--ember); color: var(--ember-ink); }
+  button.reset-btn:focus-visible{ outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .recipe-readout{
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-soft);
+    background: var(--paper-sunken); border-radius: 4px; padding: 10px 12px; line-height: 1.6;
+  }
+  .recipe-readout b{ color: var(--ink); }
+
+  /* ---------- stat tiles ---------- */
+  .stat-row{ display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 12px; }
+  .stat-tile{ background: var(--paper-raised); border:1px solid var(--line); border-radius:6px; padding: 13px 15px; box-shadow: var(--shadow); }
+  .stat-tile .label{ font-family: var(--font-mono); font-size: 10.5px; text-transform:uppercase; letter-spacing:.06em; color: var(--ink-muted); }
+  .stat-tile .num{ font-family: var(--font-mono); font-size: 25px; font-weight: 600; margin-top: 4px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .stat-tile .num.ember{ color: var(--ember-ink); }
+  .stat-tile .foot{ font-size: 11px; color: var(--ink-muted); margin-top: 2px; }
+
+  .content-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 1080px){ .content-grid{ grid-template-columns: 1fr; } }
+  .span2{ grid-column: 1 / -1; }
+
+  /* ---------- charts ---------- */
+  svg.chart{ width:100%; height:auto; display:block; overflow: visible; }
+  svg.chart text{ font-family: var(--font-mono); fill: var(--ink-muted); font-size: 9.5px; }
+  svg.chart .axis-line{ stroke: var(--line); stroke-width:1; }
+  svg.chart .grid-line{ stroke: var(--line); stroke-width:1; opacity:.55; }
+  svg.chart .zero-line{ stroke: var(--line-strong); stroke-width:1; }
+  .legend{ display:flex; gap:14px; flex-wrap:wrap; font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); margin-top:10px; }
+  .legend .item{ display:flex; align-items:center; gap:6px; }
+  .legend .swatch{ width:9px; height:9px; border-radius:2px; }
+  .legend .swatch.line{ width:14px; height:2px; border-radius:1px; }
+
+  .tooltip{
+    position: fixed; pointer-events:none; z-index: 50; background: var(--ink); color: var(--paper);
+    font-family: var(--font-mono); font-size: 11.5px; padding: 7px 10px; border-radius: 4px; line-height:1.5;
+    box-shadow: 0 6px 18px rgba(0,0,0,.25); opacity: 0; transition: opacity .08s ease; max-width: 240px;
+  }
+  :root[data-theme="dark"] .tooltip, @media (prefers-color-scheme: dark){ .tooltip{ background: var(--paper-raised); color: var(--ink); border: 1px solid var(--line-strong); } }
+  .tooltip.show{ opacity: 1; }
+  .tooltip .t-row{ display:flex; justify-content:space-between; gap:10px; }
+  .tooltip .t-title{ font-weight:600; margin-bottom:3px; opacity:.85; }
+
+  .badge{ display:inline-flex; align-items:center; gap:5px; font-family: var(--font-mono); font-size: 10.5px; padding: 2px 7px; border-radius: 10px; font-weight:600; letter-spacing:.02em; }
+  .badge.good{ background: var(--good-soft); color: var(--good); }
+  .badge.warn{ background: var(--warn-soft); color: var(--warn); }
+  .badge.critical{ background: var(--critical-soft); color: var(--critical); }
+  .badge .dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+  .small-multiples{ display:grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 1080px){ .small-multiples{ grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px){ .small-multiples{ grid-template-columns: 1fr; } }
+
+  .callout{
+    display:flex; gap:14px; align-items:flex-start; background: var(--ember-soft); border: 1px solid var(--ember);
+    border-radius: 6px; padding: 14px 16px; margin-top: 14px;
+  }
+  .callout .num{ font-family: var(--font-mono); font-size: 28px; font-weight:700; color: var(--ember-ink); white-space:nowrap; }
+  .callout p{ margin:0; font-size: 13px; color: var(--ink-soft); line-height:1.55; }
+  .callout p b{ color: var(--ink); }
+
+  .ablation-bars{ display:flex; flex-direction:column; gap:7px; }
+  .ablation-row{ display:grid; grid-template-columns: 78px 1fr 52px; align-items:center; gap:10px; }
+  .ablation-row .dots{ display:flex; gap:4px; }
+  .ablation-row .dots span{ width:7px; height:7px; border-radius:2px; border:1.4px solid var(--line-strong); }
+  .ablation-row .dots span.on{ background: var(--ink-soft); border-color: var(--ink-soft); }
+  .ablation-row .track{ position:relative; height: 14px; background: var(--paper-sunken); border-radius:3px; overflow:hidden; }
+  .ablation-row .fill{ position:absolute; top:0; left:0; bottom:0; background: var(--steel); border-radius:3px; }
+  .ablation-row.current .fill{ background: var(--ember); }
+  .ablation-row .fillval{ font-family: var(--font-mono); font-size: 11px; text-align:right; color: var(--ink-soft); }
+  .ablation-row.current .fillval{ color: var(--ember-ink); font-weight:700; }
+
+  .foot-note{ margin-top: 60px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 12px; line-height:1.6; }
+  .foot-note code{ font-family: var(--font-mono); background: var(--paper-sunken); padding: 1px 5px; border-radius:3px; }
+
+  table.data-table{ width:100%; border-collapse: collapse; font-size: 12.5px; }
+  table.data-table th{ text-align:left; font-family: var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color: var(--ink-muted); font-weight:600; padding: 6px 10px; border-bottom: 1px solid var(--line-strong); }
+  table.data-table td{ padding: 6px 10px; border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .table-wrap{ overflow-x:auto; }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <span class="eyebrow">Petroleum Coke &rarr; Battery-Grade Graphite &middot; Catalytic Graphitization</span>
+    <h1>What does &ldquo;97% graphitized&rdquo; actually mean?</h1>
+    <p class="thesis">
+      X-ray diffraction's Degree of Graphitization (DG%) is computed from where the
+      carbon (002) peak <b>sits</b> &mdash; not how much of the sample actually got there.
+      A scan can read DG&nbsp;&asymp;&nbsp;97% while a large mass fraction is still amorphous,
+      because the disordered carbon scatters as a broad hump with no sharp peak to average in.
+      The panels below ground that gap in the 17 real furnace runs on file, then let you drive the
+      mass-balance / kinetics model that tries to explain it.
+    </p>
+    <div class="phase-key">
+      <span class="item"><span class="swatch" style="background:var(--ochre)"></span>Amorphous carbon &mdash; disordered</span>
+      <span class="item"><span class="swatch" style="background:var(--steel)"></span>Turbostratic carbon &mdash; intermediate</span>
+      <span class="item"><span class="swatch" style="background:var(--ember)"></span>Graphitic carbon &mdash; ordered</span>
+    </div>
+  </header>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 1 : REAL DATA                                         -->
+  <!-- ============================================================ -->
+  <section class="block" id="sec-data">
+    <div class="block-head">
+      <h2>1&nbsp;&middot;&nbsp;The gap, in the real scans</h2>
+      <div class="desc">17 XRD scans on file, each parsed from its own recipe filename. Position-only DG% (ember, internal-standard 2&theta;-corrected) and the amorphous-aware crystallinity index (steel, &times;100) plotted against every swept parameter.</div>
+    </div>
+    <div class="small-multiples" id="gt-charts"></div>
+    <div class="callout" id="gt-callout">
+      <div class="num" id="gt-callout-num">&mdash;</div>
+      <p id="gt-callout-text">Loading&hellip;</p>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 2 : SIMULATOR                                         -->
+  <!-- ============================================================ -->
+  <section class="block" id="sec-sim">
+    <div class="block-head">
+      <h2>2&nbsp;&middot;&nbsp;Drive the model</h2>
+      <div class="desc">A mass-conserving ODE (devolatilization &rarr; calcination &rarr; Boudouard etch &rarr; Fe-catalyzed graphitization &rarr; sulfur trapping &rarr; acid wash), running live in your browser with kinetics fit to the dataset above (RMSE <span class="mono" id="fit-rmse">&mdash;</span> on 26 residuals).</div>
+    </div>
+
+    <div class="sim-grid">
+      <div class="rail">
+        <div class="card">
+          <div class="card-title">Recipe</div>
+          <div class="control">
+            <label>Fe catalyst <span class="val"><span id="v-fe">4.0</span>&nbsp;g</span></label>
+            <input type="range" id="s-fe" min="0.5" max="10" step="0.5" value="4">
+          </div>
+          <div class="control">
+            <label>CaCO&#8323; additive <span class="val"><span id="v-caco3">0.50</span>&nbsp;g</span></label>
+            <input type="range" id="s-caco3" min="0" max="1.2" step="0.05" value="0.5">
+          </div>
+          <div class="control">
+            <label>Furnace temperature <span class="val"><span id="v-temp">1000</span>&nbsp;&deg;C</span></label>
+            <input type="range" id="s-temp" min="900" max="1400" step="10" value="1000">
+          </div>
+          <div class="control">
+            <label>Hold time <span class="val"><span id="v-time">2.0</span>&nbsp;h</span></label>
+            <input type="range" id="s-time" min="0" max="13" step="1" value="3">
+          </div>
+          <div class="recipe-readout" id="recipe-readout">2.0 g PC</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">CaCO&#8323; mechanism hypotheses</div>
+          <div class="card-sub">Independently switchable. H1 is confirmed by the no-CaCO&#8323; runs; H2/H3 are not yet identified from XRD alone (their fit parameters rail to bounds).</div>
+          <div class="toggle-row">
+            <label class="switch"><input type="checkbox" id="t-h1" checked><span class="track"></span><span class="thumb"></span></label>
+            <div class="toggle-copy"><div class="name">H1 &middot; Sulfur trapping <span class="badge good"><span class="dot"></span>confirmed</span></div><div class="desc">CaO + S &rarr; CaS, keeping sulfur off the Fe catalyst. Turn it off &mdash; nothing graphitizes, just as the no-CaCO&#8323; runs showed.</div></div>
+          </div>
+          <div class="toggle-row">
+            <label class="switch"><input type="checkbox" id="t-h2" checked><span class="track"></span><span class="thumb"></span></label>
+            <div class="toggle-copy"><div class="name">H2 &middot; Boudouard etching</div><div class="desc">Calcination CO&#8322; selectively gasifies the more-reactive amorphous carbon.</div></div>
+          </div>
+          <div class="toggle-row">
+            <label class="switch"><input type="checkbox" id="t-h3" checked><span class="track"></span><span class="thumb"></span></label>
+            <div class="toggle-copy"><div class="name">H3 &middot; Catalyst dispersion</div><div class="desc">CaO improves Fe&ndash;carbon interfacial contact.</div></div>
+          </div>
+        </div>
+
+        <button class="reset-btn" id="btn-reset">Reset to fitted defaults</button>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:18px;">
+
+        <div class="stat-row" id="stat-tiles"></div>
+
+        <div class="content-grid">
+          <div class="card span2">
+            <div class="card-title">Phase evolution across the furnace run</div>
+            <div class="card-sub">Carbon-phase mass fraction vs. time, ramp + isothermal hold.</div>
+            <div id="chart-evolution"></div>
+            <div class="legend">
+              <span class="item"><span class="swatch" style="background:var(--ochre)"></span>Amorphous</span>
+              <span class="item"><span class="swatch" style="background:var(--steel)"></span>Turbostratic</span>
+              <span class="item"><span class="swatch" style="background:var(--ember)"></span>Graphitic</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Simulated XRD (002) region</div>
+            <div class="card-sub">Rendered from the current phase masses &mdash; same forward model validated against the real engine.</div>
+            <div id="chart-xrd"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Position vs. amount, made concrete</div>
+            <div class="card-sub">What peak <i>position alone</i> would report, next to what's actually there by mass.</div>
+            <div class="stat-row" id="stat-gap"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Predicted TGA / DTG burn-off</div>
+            <div class="card-sub">Amorphous carbon oxidizes early, graphitic carbon late &mdash; an independent, diffraction-free split (no TGA data collected yet).</div>
+            <div id="chart-tga"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Mass ledger</div>
+            <div class="card-sub">Pellet &rarr; post-furnace &rarr; post-acid, this recipe.</div>
+            <div id="chart-ledger"></div>
+          </div>
+
+          <div class="card span2">
+            <div class="card-title">Hypothesis ablation, this recipe</div>
+            <div class="card-sub">All 8 combinations of H1/H2/H3 &mdash; final graphitic mass fraction. Current toggle state highlighted.</div>
+            <div class="ablation-bars" id="ablation-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 3 : CALIBRATION                                       -->
+  <!-- ============================================================ -->
+  <section class="block" id="sec-cal">
+    <div class="block-head">
+      <h2>3&nbsp;&middot;&nbsp;Closing the loop</h2>
+      <div class="desc">Physical PC&harr;graphite blends at known composition, rendered by the forward model and re-measured by the real engine's own normalized-area metric &mdash; the calibration route the project is chasing.</div>
+    </div>
+    <div class="content-grid">
+      <div class="card">
+        <div class="card-title">Known vs. recovered graphite wt%</div>
+        <div class="card-sub">Trained on 6 synthetic blends (steel), validated on 3 held-out blends (ember).</div>
+        <div id="chart-cal"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Calibration quality</div>
+        <div class="stat-row" id="cal-stats"></div>
+        <p style="font-size:12.5px; color:var(--ink-soft); margin-top:14px; line-height:1.6;">
+          The normalized (002) area is a <b style="color:var(--ink)">model-dependent index</b>, not a weight
+          fraction by construction (Ruland &amp; Smarsly) &mdash; it must be anchored to samples of known
+          composition before it means &ldquo;X% graphite by mass.&rdquo; This is that anchor, built from the
+          same forward model driving the simulator above.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot-note">
+    Kinetics fit against 17 real XRD scans + 6 weighed mass-balance rows (least squares, RMSE noted above).
+    The in-browser simulator re-integrates the same ODE system with a fixed-step RK4 (<code>dt = 0.05 min</code>,
+    verified against the reference LSODA solver) so every slider move runs entirely client-side &mdash; nothing
+    here calls out to a server. Real recipe compositions are shown because this page is private to you.
+  </p>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script id="gt-metrics-data" type="application/json">__GT_METRICS__</script>
+<script id="cal-data" type="application/json">__CAL_DATA__</script>
+
+<script>
+(function(){
+"use strict";
+
+/* ======================================================================
+   THEME
+====================================================================== */
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+/* ======================================================================
+   DATA
+====================================================================== */
+const GT = JSON.parse(document.getElementById('gt-metrics-data').textContent);
+const CAL = JSON.parse(document.getElementById('cal-data').textContent);
+const FITTED_PARAMS = __FITTED_PARAMS__;
+
+/* ======================================================================
+   KINETICS  (faithful port of sim/kinetics.py + sim/state.py)
+====================================================================== */
+const FIELDS = ["C_am","C_turb","C_gr","S","VOL","CaCO3","CaO","CaS","Fe","Q",
+                "CO2_pool","CO2_out","CO_out","S_out","VOL_out","O_out"];
+const IDX = {}; FIELDS.forEach((f,i)=>IDX[f]=i);
+const NF = FIELDS.length;
+
+const M_C=12.011, M_CaCO3=100.086, M_CaO=56.077, M_S=32.06, M_CaS=72.138, M_CO2=44.009, M_CO=28.01;
+const M_O = M_CaO + M_S - M_CaS;
+const R_GAS = 8.314;
+
+const BASE_PARAMS = {
+  k0_dev:1.7e3, Ea_dev:60e3,
+  k0_cal:3e7, Ea_cal:180e3,
+  k_esc:0.5,
+  k0_boud:1e5, Ea_boud:150e3,
+  k0_graph:70.0, Ea_graph:100e3, K_fe:0.18, gamma_turb:0.7, q_gain:1.0,
+  h3_gain:2.0, h3_uhalf:0.02,
+  k0_sgas:4.6e5, Ea_sgas:250e3, k0_trap:100.0, Ea_trap:80e3,
+  p_poison:800.0, alpha_H2:8.0,
+  ramp_C_per_min:10.0, T0_C:25.0,
+  eta_wash_fe:0.97, eta_wash_ca:0.97,
+};
+const DEFAULT_PARAMS = Object.assign({}, BASE_PARAMS, FITTED_PARAMS);
+const C_WT = __C_WT__, S_WT = __S_WT__; // GPC composition, injected from engine at build time
+
+function arrh(k0, Ea, T){ return k0*Math.exp(-Ea/(R_GAS*T)); }
+
+function temperatureK(tMin, recipe, p){
+  const tRamp = (recipe.T - p.T0_C)/p.ramp_C_per_min;
+  const T_C = p.T0_C + p.ramp_C_per_min*Math.min(tMin, tRamp);
+  return T_C + 273.15;
+}
+
+function rhs(t, y, recipe, p, h1, h2, h3, out){
+  const T = temperatureK(t, recipe, p);
+  out.fill(0);
+  const g = (i)=> y[i] > 0 ? y[i] : 0;
+  const C_am=g(IDX.C_am), C_turb=g(IDX.C_turb), C_gr=g(IDX.C_gr);
+  const C_tot = C_am+C_turb+C_gr;
+  const S=g(IDX.S), VOL=g(IDX.VOL), CaCO3=g(IDX.CaCO3), CaO=g(IDX.CaO), CaS=g(IDX.CaS), Fe=g(IDX.Fe);
+  const solids = C_tot+S+VOL+CaCO3+CaO+CaS+Fe;
+
+  // devolatilization
+  const r_dev = arrh(p.k0_dev,p.Ea_dev,T)*VOL;
+  out[IDX.VOL] -= r_dev; out[IDX.VOL_out] += r_dev;
+
+  // calcination: CaCO3 -> CaO + CO2
+  const r_cal = arrh(p.k0_cal,p.Ea_cal,T)*CaCO3;
+  out[IDX.CaCO3] -= r_cal;
+  out[IDX.CaO] += r_cal*(M_CaO/M_CaCO3);
+  out[IDX.CO2_pool] += r_cal*(M_CO2/M_CaCO3);
+
+  // CO2 pool: escape vs Boudouard (H2 selectivity)
+  const pool = g(IDX.CO2_pool);
+  const r_esc = p.k_esc*pool;
+  const alpha = h2 ? p.alpha_H2 : 1.0;
+  const w_am = alpha*C_am, w_turb = Math.sqrt(alpha)*C_turb, w_gr = C_gr;
+  const w_sum = w_am+w_turb+w_gr;
+  const r_boud = arrh(p.k0_boud,p.Ea_boud,T)*pool*(C_tot>0 ? w_sum/C_tot : 0);
+  out[IDX.CO2_pool] -= (r_esc+r_boud);
+  out[IDX.CO2_out] += r_esc;
+  const c_etch = r_boud*(M_C/M_CO2);
+  if(w_sum>0){
+    out[IDX.C_am] -= c_etch*(w_am/w_sum);
+    out[IDX.C_turb] -= c_etch*(w_turb/w_sum);
+    out[IDX.C_gr] -= c_etch*(w_gr/w_sum);
+  }
+  out[IDX.CO_out] += r_boud + c_etch;
+
+  // graphitization (Fe-catalyzed dissolution-reprecipitation)
+  const fe_frac = solids>0 ? Fe/solids : 0;
+  const f_fe = fe_frac>0 ? fe_frac/(p.K_fe+fe_frac) : 0;
+  let disp = 1.0;
+  if(h3 && solids>0){
+    const u = CaO/solids;
+    disp += p.h3_gain*u/(u+p.h3_uhalf);
+  }
+  const poison = Fe>0 ? 1.0/(1.0+p.p_poison*(S/Fe)) : 0.0;
+  const k_g = arrh(p.k0_graph,p.Ea_graph,T)*f_fe*disp*poison;
+  const r_am = k_g*C_am;
+  const r_tg = p.gamma_turb*k_g*C_turb;
+  out[IDX.C_am] -= r_am;
+  out[IDX.C_turb] += r_am - r_tg;
+  out[IDX.C_gr] += r_tg;
+  out[IDX.Q] = p.q_gain*k_g*(1.0 - Math.min(y[IDX.Q],1.0));
+
+  // sulfur: thermal release + H1 trapping
+  const r_sgas = arrh(p.k0_sgas,p.Ea_sgas,T)*S;
+  out[IDX.S] -= r_sgas; out[IDX.S_out] += r_sgas;
+  if(h1){
+    const r_trap = arrh(p.k0_trap,p.Ea_trap,T)*S*CaO;
+    out[IDX.S] -= r_trap;
+    out[IDX.CaO] -= r_trap*(M_CaO/M_S);
+    out[IDX.CaS] += r_trap*(M_CaS/M_S);
+    out[IDX.O_out] += r_trap*(M_O/M_S);
+  }
+  return out;
+}
+
+function initialState(recipe){
+  const y = new Float64Array(NF);
+  y[IDX.C_am] = recipe.pc*C_WT;
+  y[IDX.S] = recipe.pc*S_WT;
+  y[IDX.VOL] = recipe.pc*Math.max(0,1-C_WT-S_WT);
+  y[IDX.CaCO3] = recipe.caco3;
+  y[IDX.Fe] = recipe.fe;
+  return y;
+}
+
+// fixed-step RK4, dt=0.05 min -- verified against scipy LSODA across the full
+// T/CaCO3 grid (see build notes); state is clamped >=0 each step (Q in [0,1]).
+function integrate(recipe, p, h1, h2, h3, dt, maxPoints){
+  dt = dt || 0.05; maxPoints = maxPoints || 160;
+  const y0 = initialState(recipe);
+  const tRamp = (recipe.T - p.T0_C)/p.ramp_C_per_min;
+  const tEnd = tRamp + recipe.timeH*60;
+  const n = Math.max(1, Math.ceil(tEnd/dt));
+  const step = tEnd/n;
+  const keepEvery = Math.max(1, Math.floor(n/maxPoints));
+  let y = Float64Array.from(y0);
+  const k1=new Float64Array(NF), k2=new Float64Array(NF), k3=new Float64Array(NF), k4=new Float64Array(NF), tmp=new Float64Array(NF);
+  const times=[0], traj=[Array.from(y0)];
+  for(let i=0;i<n;i++){
+    const t = i*step;
+    rhs(t,y,recipe,p,h1,h2,h3,k1);
+    for(let j=0;j<NF;j++) tmp[j]=y[j]+step/2*k1[j];
+    rhs(t+step/2,tmp,recipe,p,h1,h2,h3,k2);
+    for(let j=0;j<NF;j++) tmp[j]=y[j]+step/2*k2[j];
+    rhs(t+step/2,tmp,recipe,p,h1,h2,h3,k3);
+    for(let j=0;j<NF;j++) tmp[j]=y[j]+step*k3[j];
+    rhs(t+step,tmp,recipe,p,h1,h2,h3,k4);
+    for(let j=0;j<NF;j++){
+      let v = y[j] + step/6*(k1[j]+2*k2[j]+2*k3[j]+k4[j]);
+      y[j] = (j===IDX.Q) ? Math.min(Math.max(v,0),1) : Math.max(v,0);
+    }
+    if((i+1)%keepEvery===0 || i===n-1){ times.push((i+1)*step); traj.push(Array.from(y)); }
+  }
+  return {times, traj, y0:Array.from(y0), yFinal:Array.from(y)};
+}
+
+function runMassBalance(recipe, p, h1, h2, h3){
+  const res = integrate(recipe, p, h1, h2, h3);
+  const y = res.yFinal;
+  const postFurnace = y[IDX.C_am]+y[IDX.C_turb]+y[IDX.C_gr]+y[IDX.S]+y[IDX.VOL]+y[IDX.CaCO3]+y[IDX.CaO]+y[IDX.CaS]+y[IDX.Fe];
+  const removed = p.eta_wash_fe*y[IDX.Fe] + p.eta_wash_ca*(y[IDX.CaO]+y[IDX.CaS]+y[IDX.CaCO3]);
+  const postAcid = postFurnace - removed;
+  const carbon = y[IDX.C_am]+y[IDX.C_turb]+y[IDX.C_gr];
+  const feedC = res.y0[IDX.C_am];
+  const fracs = carbon>0
+    ? {amorphous:y[IDX.C_am]/carbon, turbostratic:y[IDX.C_turb]/carbon, graphitic:y[IDX.C_gr]/carbon}
+    : {amorphous:0, turbostratic:0, graphitic:0};
+  return {
+    pellet: recipe.pc+recipe.fe+recipe.caco3, postFurnace, postAcid,
+    carbonYield: feedC>0 ? carbon/feedC : 0, fracs, orderingQ: y[IDX.Q],
+    trajectory: res, sRemaining: y[IDX.S],
+  };
+}
+
+/* ======================================================================
+   XRD FORWARD MODEL  (port of sim/xrd_forward.py, display window only)
+====================================================================== */
+const WAVELENGTH = 1.54187, D_GRAPHITE = 3.354, D_TURBOSTRATIC = 3.440;
+const D_GR_2T = 2*Math.asin(WAVELENGTH/(2*D_GRAPHITE))*180/Math.PI;
+const D_TURB_2T = 2*Math.asin(WAVELENGTH/(2*D_TURBOSTRATIC))*180/Math.PI;
+
+function pseudoVoigt(x,A,xc,w,mu){
+  const ln2=Math.LN2, dx=x-xc;
+  const lorentzian=(2/Math.PI)*(w/(4*dx*dx+w*w));
+  const gaussian=(Math.sqrt(4*ln2)/(Math.sqrt(Math.PI)*w))*Math.exp(-(4*ln2/(w*w))*dx*dx);
+  return A*(mu*lorentzian+(1-mu)*gaussian);
+}
+function lcToFwhmDeg(lc, twoTheta, K){
+  K = K||0.9;
+  const theta=(twoTheta/2)*Math.PI/180;
+  return (K*WAVELENGTH/(Math.max(lc,1)*Math.cos(theta)))*180/Math.PI;
+}
+function renderXRD(fracs, orderingQ){
+  const total = fracs.amorphous+fracs.turbostratic+fracs.graphitic || 1;
+  const am=fracs.amorphous/total, tb=fracs.turbostratic/total, gr=fracs.graphitic/total;
+  const q = Math.min(Math.max(orderingQ,0),1);
+  const lc = 30+550*q;
+  const xcGr = D_TURB_2T + (D_GR_2T-D_TURB_2T)*q;
+  const wGr = Math.max(lcToFwhmDeg(lc,xcGr), 0.06);
+  const SCATTER = {am:0.35, tb:0.85, gr:1.0};
+  const xmin=20, xmax=32, step=0.02, scale=300;
+  const xs=[], ys=[];
+  for(let x=xmin; x<=xmax; x+=step){
+    let y = 0.05;
+    y += scale*am*SCATTER.am*pseudoVoigt(x,1.0,23.5,8.0,0.15);
+    y += scale*tb*SCATTER.tb*pseudoVoigt(x,1.0,D_TURB_2T,0.9,1.0);
+    y += scale*gr*SCATTER.gr*pseudoVoigt(x,1.0,xcGr,wGr,0.55);
+    xs.push(x); ys.push(Math.max(y,0));
+  }
+  const dPrime = WAVELENGTH/(2*Math.sin(xcGr/2*Math.PI/180));
+  const dgPercent = (D_TURBOSTRATIC-dPrime)/(D_TURBOSTRATIC-D_GRAPHITE)*100;
+  return {xs, ys, xcGr, wGr, dgPercent};
+}
+
+/* ======================================================================
+   TGA / DTG  (port of sim/tga.py)
+====================================================================== */
+const BURN_KINETICS = {amorphous:[1.0e7,120e3], turbostratic:[1.0e8,155e3], graphitic:[1.0e9,195e3]};
+function predictDTG(fracs, heatingRate, Tstart, Tend, n){
+  heatingRate=heatingRate||10; Tstart=Tstart||200; Tend=Tend||900; n=n||300;
+  const total = fracs.amorphous+fracs.turbostratic+fracs.graphitic || 1;
+  const fr = {amorphous:fracs.amorphous/total, turbostratic:fracs.turbostratic/total, graphitic:fracs.graphitic/total};
+  const dT = (Tend-Tstart)/(n-1), dtMin = dT/heatingRate;
+  const remaining = {amorphous:1, turbostratic:1, graphitic:1};
+  const TC=new Array(n), dtg=new Array(n);
+  TC[0]=Tstart; dtg[0]=0;
+  for(let i=1;i<n;i++){
+    const T_C = Tstart+i*dT, T_K = T_C+273.15;
+    let totalRate=0;
+    for(const phase in BURN_KINETICS){
+      const k0=BURN_KINETICS[phase][0], Ea=BURN_KINETICS[phase][1];
+      const k = k0*Math.exp(-Ea/(R_GAS*T_K));
+      let dRem = k*remaining[phase]*dtMin;
+      dRem = Math.min(dRem, remaining[phase]);
+      remaining[phase] -= dRem;
+      totalRate += fr[phase]*dRem/dtMin;
+    }
+    TC[i]=T_C; dtg[i]=totalRate;
+  }
+  return {TC, dtg};
+}
+
+/* ======================================================================
+   CHART TOOLKIT  (thin, dependency-free SVG line / bar / scatter)
+====================================================================== */
+const tooltipEl = document.getElementById('tooltip');
+function showTooltip(x,y,html){ tooltipEl.innerHTML=html; tooltipEl.style.left=(x+14)+'px'; tooltipEl.style.top=(y+14)+'px'; tooltipEl.classList.add('show'); }
+function hideTooltip(){ tooltipEl.classList.remove('show'); }
+
+function scaleFn(domain, range){
+  const span = (domain[1]-domain[0])||1;
+  return v => range[0] + (v-domain[0])/span*(range[1]-range[0]);
+}
+function evenTicks(min,max,count){
+  const arr=[]; for(let i=0;i<=count;i++) arr.push(min+(max-min)*i/count); return arr;
+}
+function fmt(v,d){ d=d===undefined?1:d; return Number(v).toFixed(d); }
+
+const CHART_W = 520, CHART_H = 220;
+const MARGIN = {l:34, r:12, t:10, b:24};
+
+function svgOpen(w,h){ return '<svg class="chart" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="xMidYMid meet">'; }
+
+function axesSVG(xDomain,yDomain,xTicks,yTicks,xFmt,yFmt,w,h,m){
+  const X=scaleFn(xDomain,[m.l,w-m.r]), Y=scaleFn(yDomain,[h-m.b,m.t]);
+  let s='';
+  yTicks.forEach(function(t){
+    const y=Y(t);
+    s += '<line class="grid-line" x1="'+m.l+'" x2="'+(w-m.r)+'" y1="'+y+'" y2="'+y+'"/>';
+    s += '<text x="'+(m.l-6)+'" y="'+(y+3)+'" text-anchor="end">'+yFmt(t)+'</text>';
+  });
+  xTicks.forEach(function(t){
+    const x=X(t);
+    s += '<text x="'+x+'" y="'+(h-m.b+14)+'" text-anchor="middle">'+xFmt(t)+'</text>';
+  });
+  s += '<line class="axis-line" x1="'+m.l+'" x2="'+(w-m.r)+'" y1="'+(h-m.b)+'" y2="'+(h-m.b)+'"/>';
+  return {svg:s, X:X, Y:Y};
+}
+
+function pathFromPoints(pts){
+  return pts.map(function(p,i){ return (i===0?'M':'L')+p[0].toFixed(2)+' '+p[1].toFixed(2); }).join(' ');
+}
+
+// multi-series line chart with shared crosshair tooltip
+function drawLineChart(container, cfg){
+  const w=cfg.w||CHART_W, h=cfg.h||CHART_H, m=cfg.m||MARGIN;
+  const xTicks = cfg.xTicks || evenTicks(cfg.xDomain[0],cfg.xDomain[1],4);
+  const yTicks = cfg.yTicks || evenTicks(cfg.yDomain[0],cfg.yDomain[1],4);
+  const axes = axesSVG(cfg.xDomain,cfg.yDomain,xTicks,yTicks,cfg.xFmt||(function(v){return fmt(v,0);}),cfg.yFmt||(function(v){return fmt(v,0);}),w,h,m);
+  let body = axes.svg;
+
+  cfg.series.forEach(function(s){
+    const pts = s.x.map(function(xv,i){ return [axes.X(xv), axes.Y(s.y[i])]; });
+    if(s.area){
+      const base = axes.Y(cfg.yDomain[0]);
+      const areaPts = pts.slice();
+      const d = pathFromPoints(pts) + ' L'+pts[pts.length-1][0].toFixed(2)+' '+base.toFixed(2)+' L'+pts[0][0].toFixed(2)+' '+base.toFixed(2)+' Z';
+      body += '<path d="'+d+'" fill="'+s.color+'" opacity="0.16" stroke="none"/>';
+    }
+    body += '<path d="'+pathFromPoints(pts)+'" fill="none" stroke="'+s.color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  });
+
+  // endpoint markers
+  cfg.series.forEach(function(s){
+    const last = s.x.length-1;
+    const cx = axes.X(s.x[last]), cy = axes.Y(s.y[last]);
+    body += '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="'+s.color+'" stroke="var(--paper-raised)" stroke-width="1.5"/>';
+  });
+
+  body += '<rect class="hover-catch" x="'+m.l+'" y="'+m.t+'" width="'+(w-m.l-m.r)+'" height="'+(h-m.t-m.b)+'" fill="transparent"/>';
+  container.innerHTML = svgOpen(w,h)+body+'</svg>';
+
+  const svgEl = container.querySelector('svg');
+  const catchEl = container.querySelector('.hover-catch');
+  const invX = scaleFn([m.l,w-m.r], cfg.xDomain);
+  catchEl.addEventListener('mousemove', function(evt){
+    const rect = svgEl.getBoundingClientRect();
+    const px = (evt.clientX-rect.left)/rect.width*w;
+    const xv = invX(px);
+    let rows='';
+    cfg.series.forEach(function(s){
+      let bi=0, bd=Infinity;
+      for(let i=0;i<s.x.length;i++){ const dd=Math.abs(s.x[i]-xv); if(dd<bd){bd=dd;bi=i;} }
+      rows += '<div class="t-row"><span style="color:'+s.color+'">&#9632; '+s.name+'</span><span>'+(cfg.tipFmt?cfg.tipFmt(s.y[bi]):fmt(s.y[bi],1))+'</span></div>';
+    });
+    const title = cfg.tipTitle ? cfg.tipTitle(xv) : (cfg.xFmt?cfg.xFmt(xv):fmt(xv,1));
+    showTooltip(evt.clientX, evt.clientY, '<div class="t-title">'+title+'</div>'+rows);
+  });
+  catchEl.addEventListener('mouseleave', hideTooltip);
+}
+
+// scatter chart, 1-2 series, per-point tooltip via nearest-point hit testing
+function drawScatterChart(container, cfg){
+  const w=cfg.w||260, h=cfg.h||170, m=cfg.m||{l:30,r:8,t:8,b:20};
+  const xTicks = cfg.xTicks || evenTicks(cfg.xDomain[0],cfg.xDomain[1],3);
+  const yTicks = cfg.yTicks || evenTicks(cfg.yDomain[0],cfg.yDomain[1],3);
+  const axes = axesSVG(cfg.xDomain,cfg.yDomain,xTicks,yTicks,cfg.xFmt||(function(v){return fmt(v,0);}),cfg.yFmt||(function(v){return fmt(v,0);}),w,h,m);
+  let body = axes.svg;
+  const allPts = [];
+  cfg.series.forEach(function(s){
+    s.x.forEach(function(xv,i){
+      const cx=axes.X(xv), cy=axes.Y(s.y[i]);
+      body += '<circle cx="'+cx+'" cy="'+cy+'" r="'+(s.r||3.2)+'" fill="'+s.color+'" fill-opacity="'+(s.opacity!==undefined?s.opacity:0.85)+'" stroke="var(--paper-raised)" stroke-width="0.75"/>';
+      allPts.push({cx:cx,cy:cy,label:s.label?s.label(i):(cfg.xFmt?cfg.xFmt(xv):xv)+', '+fmt(s.y[i],1), seriesName:s.name, color:s.color});
+    });
+  });
+  if(cfg.refLine){
+    const p1=[axes.X(cfg.refLine[0][0]),axes.Y(cfg.refLine[0][1])], p2=[axes.X(cfg.refLine[1][0]),axes.Y(cfg.refLine[1][1])];
+    body += '<line x1="'+p1[0]+'" y1="'+p1[1]+'" x2="'+p2[0]+'" y2="'+p2[1]+'" stroke="var(--line-strong)" stroke-width="1.2" stroke-dasharray="3,3"/>';
+  }
+  body += '<rect class="hover-catch" x="'+m.l+'" y="'+m.t+'" width="'+(w-m.l-m.r)+'" height="'+(h-m.t-m.b)+'" fill="transparent"/>';
+  container.innerHTML = svgOpen(w,h)+body+'</svg>';
+  const svgEl = container.querySelector('svg');
+  const catchEl = container.querySelector('.hover-catch');
+  catchEl.addEventListener('mousemove', function(evt){
+    const rect = svgEl.getBoundingClientRect();
+    const px=(evt.clientX-rect.left)/rect.width*w, py=(evt.clientY-rect.top)/rect.height*h;
+    let best=null, bestD=Infinity;
+    allPts.forEach(function(p){ const dd=(p.cx-px)*(p.cx-px)+(p.cy-py)*(p.cy-py); if(dd<bestD){bestD=dd;best=p;} });
+    if(best && bestD < 400){
+      showTooltip(evt.clientX, evt.clientY, '<div class="t-title" style="color:'+best.color+'">'+best.seriesName+'</div>'+best.label);
+    } else { hideTooltip(); }
+  });
+  catchEl.addEventListener('mouseleave', hideTooltip);
+}
+
+/* ======================================================================
+   SECTION 1 -- REAL DATA SMALL MULTIPLES
+====================================================================== */
+const FACTORS = [
+  {key:'temperature_C', label:'Temperature (°C)', fmt:function(v){return fmt(v,0);}},
+  {key:'time_h', label:'Time (h)', fmt:function(v){return fmt(v,1);}},
+  {key:'fe_ratio', label:'Fe (g)', fmt:function(v){return fmt(v,0);}},
+  {key:'caco3_ratio', label:'CaCO₃ (g)', fmt:function(v){return fmt(v,2);}},
+];
+function buildGroundTruthCharts(){
+  const wrap = document.getElementById('gt-charts');
+  const rows = GT.filter(function(r){ return !r.error; });
+  FACTORS.forEach(function(f){
+    const card = document.createElement('div');
+    card.className='card';
+    card.innerHTML = '<div class="card-title">'+f.label+'</div><div class="gt-chart-slot"></div>';
+    wrap.appendChild(card);
+    const xs = rows.map(function(r){ return r[f.key]; });
+    const dg = rows.map(function(r){ return r.DG_percent; });
+    const cf = rows.map(function(r){ return r.crystalline_fraction*100; });
+    const xd = [Math.min.apply(null,xs), Math.max.apply(null,xs)];
+    const pad = (xd[1]-xd[0])*0.08 || 1;
+    drawScatterChart(card.querySelector('.gt-chart-slot'), {
+      w:260, h:170,
+      xDomain:[xd[0]-pad, xd[1]+pad], yDomain:[0,110],
+      xFmt:f.fmt, yFmt:function(v){return fmt(v,0);},
+      yTicks:[0,50,100],
+      series:[
+        {name:'DG% (position)', x:xs, y:dg, color:cssVar('--ember'), r:3.4,
+         label:function(i){ return rows[i].display_name.replace(/·/g,'&middot;')+'<br>DG '+fmt(dg[i],1)+'%'; }},
+        {name:'Crystalline index ×100', x:xs, y:cf, color:cssVar('--steel'), r:3.4,
+         label:function(i){ return rows[i].display_name.replace(/·/g,'&middot;')+'<br>Index '+fmt(cf[i]/100,3); }},
+      ],
+    });
+  });
+
+  // callout: spread of crystalline index within a narrow DG% band
+  const hiDG = rows.filter(function(r){ return r.DG_percent>=90; });
+  const idxVals = hiDG.map(function(r){ return r.crystalline_fraction*100; });
+  const lo = Math.min.apply(null,idxVals), hi = Math.max.apply(null,idxVals);
+  document.getElementById('gt-callout-num').textContent = fmt(lo,0)+'–'+fmt(hi,0)+'%';
+  document.getElementById('gt-callout-text').innerHTML =
+    'Across the <b>'+hiDG.length+' scans reading DG% ≥ 90%</b>, the amorphous-aware crystallinity ' +
+    'index still spans <b>'+fmt(lo,0)+'% to '+fmt(hi,0)+'%</b>. Peak position alone cannot tell these runs apart — ' +
+    'exactly the blind spot Section 2 tries to explain mechanistically.';
+}
+
+/* ======================================================================
+   SECTION 2 -- SIMULATOR WIRING
+====================================================================== */
+const TIME_STEPS = [0.25,0.5,1,2,3,4,5,6,8,10,12,16,20,24];
+const els = {
+  fe: document.getElementById('s-fe'), caco3: document.getElementById('s-caco3'),
+  temp: document.getElementById('s-temp'), time: document.getElementById('s-time'),
+  h1: document.getElementById('t-h1'), h2: document.getElementById('t-h2'), h3: document.getElementById('t-h3'),
+  vfe: document.getElementById('v-fe'), vcaco3: document.getElementById('v-caco3'),
+  vtemp: document.getElementById('v-temp'), vtime: document.getElementById('v-time'),
+};
+
+function currentRecipe(){
+  return { pc:2.0, fe:parseFloat(els.fe.value), caco3:parseFloat(els.caco3.value),
+           T:parseFloat(els.temp.value), timeH:TIME_STEPS[parseInt(els.time.value,10)] };
+}
+function currentHyp(){ return {h1:els.h1.checked, h2:els.h2.checked, h3:els.h3.checked}; }
+
+function statTile(label, value, foot, emberClass){
+  return '<div class="stat-tile"><div class="label">'+label+'</div><div class="num'+(emberClass?' ember':'')+'">'+value+'</div>'+(foot?'<div class="foot">'+foot+'</div>':'')+'</div>';
+}
+
+let rafPending = false;
+function scheduleRender(){ if(rafPending) return; rafPending = true; requestAnimationFrame(function(){ rafPending=false; renderAll(); }); }
+
+function renderAll(){
+  const recipe = currentRecipe(), hyp = currentHyp();
+  els.vfe.textContent = fmt(recipe.fe,1);
+  els.vcaco3.textContent = fmt(recipe.caco3,2);
+  els.vtemp.textContent = fmt(recipe.T,0);
+  els.vtime.textContent = fmt(recipe.timeH,2);
+  document.getElementById('recipe-readout').innerHTML =
+    '<b>'+fmt(recipe.pc,1)+' g</b> PC &middot; <b>'+fmt(recipe.fe,1)+' g</b> Fe &middot; <b>'+fmt(recipe.caco3,2)+' g</b> CaCO₃ &middot; <b>'+fmt(recipe.T,0)+' °C</b> &middot; <b>'+fmt(recipe.timeH,2)+' h</b>';
+
+  const mb = runMassBalance(recipe, DEFAULT_PARAMS, hyp.h1, hyp.h2, hyp.h3);
+  const f = mb.fracs;
+
+  // stat tiles
+  document.getElementById('stat-tiles').innerHTML =
+    statTile('Ordering Q', fmt(mb.orderingQ*100,0)+'%', 'graphitic-lattice coordinate', true) +
+    statTile('Graphitic mass', fmt(f.graphitic*100,0)+'%', 'of surviving carbon') +
+    statTile('Carbon yield', fmt(mb.carbonYield*100,0)+'%', 'vs. feed carbon') +
+    statTile('Post-furnace', fmt(mb.postFurnace,3)+' g', 'from '+fmt(mb.pellet,2)+' g pellet') +
+    statTile('Post-acid', fmt(mb.postAcid,3)+' g', 'washed product');
+
+  // phase evolution chart
+  const traj = mb.trajectory;
+  const tHrs = traj.times.map(function(t){ return t/60; });
+  const totC = traj.traj.map(function(y){ return y[IDX.C_am]+y[IDX.C_turb]+y[IDX.C_gr]; });
+  const amPct = traj.traj.map(function(y,i){ return totC[i]>0? y[IDX.C_am]/totC[i]*100 : 0; });
+  const tbPct = traj.traj.map(function(y,i){ return totC[i]>0? y[IDX.C_turb]/totC[i]*100 : 0; });
+  const grPct = traj.traj.map(function(y,i){ return totC[i]>0? y[IDX.C_gr]/totC[i]*100 : 0; });
+  drawLineChart(document.getElementById('chart-evolution'), {
+    w:1040, h:230, xDomain:[0,tHrs[tHrs.length-1]||1], yDomain:[0,100],
+    yTicks:[0,25,50,75,100], xFmt:function(v){return fmt(v,1)+'h';}, yFmt:function(v){return fmt(v,0)+'%';},
+    tipTitle:function(v){ return 't = '+fmt(v,2)+' h'; }, tipFmt:function(v){return fmt(v,1)+'%';},
+    series:[
+      {name:'Amorphous', x:tHrs, y:amPct, color:cssVar('--ochre')},
+      {name:'Turbostratic', x:tHrs, y:tbPct, color:cssVar('--steel')},
+      {name:'Graphitic', x:tHrs, y:grPct, color:cssVar('--ember')},
+    ],
+  });
+
+  // synthetic XRD
+  const xrd = renderXRD(f, mb.orderingQ);
+  const yMax = Math.max.apply(null, xrd.ys)*1.12;
+  drawLineChart(document.getElementById('chart-xrd'), {
+    w:500, h:210, xDomain:[20,32], yDomain:[0,yMax],
+    yTicks:evenTicks(0,yMax,3), xFmt:function(v){return fmt(v,0)+'°';}, yFmt:function(v){return fmt(v,0);},
+    tipTitle:function(v){ return '2θ = '+fmt(v,2)+'°'; }, tipFmt:function(v){return fmt(v,1);},
+    series:[{name:'Intensity', x:xrd.xs, y:xrd.ys, color:cssVar('--ember'), area:true}],
+  });
+
+  // the "gap made concrete" stat pair
+  document.getElementById('stat-gap').innerHTML =
+    statTile('DG% (position only)', fmt(xrd.dgPercent,1)+'%', 'from peak position alone', true) +
+    statTile('Graphitic (by mass)', fmt(f.graphitic*100,1)+'%', 'true simulated fraction');
+
+  // TGA / DTG
+  const dtg = predictDTG(f);
+  drawLineChart(document.getElementById('chart-tga'), {
+    w:500, h:210, xDomain:[200,900], yDomain:[0, Math.max(0.002, Math.max.apply(null,dtg.dtg)*1.15)],
+    yTicks:evenTicks(0, Math.max(0.002, Math.max.apply(null,dtg.dtg)*1.15), 3),
+    xFmt:function(v){return fmt(v,0)+'°';}, yFmt:function(v){return fmt(v*1000,1);},
+    tipTitle:function(v){ return fmt(v,0)+' °C'; }, tipFmt:function(v){return fmt(v*1000,2)+' ×10⁻³/min';},
+    series:[{name:'DTG (mass loss rate)', x:dtg.TC, y:dtg.dtg, color:cssVar('--ember'), area:true}],
+  });
+
+  // mass ledger (simple horizontal stacked readouts)
+  const ledgerEl = document.getElementById('chart-ledger');
+  const stages = [
+    {label:'Pellet charged', val:mb.pellet},
+    {label:'Post-furnace', val:mb.postFurnace},
+    {label:'Post-acid (product)', val:mb.postAcid},
+  ];
+  const maxV = mb.pellet;
+  ledgerEl.innerHTML = stages.map(function(s){
+    const pct = Math.max(2, s.val/maxV*100);
+    return '<div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);margin-bottom:4px;"><span>'+s.label+'</span><span class="mono">'+fmt(s.val,3)+' g</span></div>'+
+      '<div style="height:10px;background:var(--paper-sunken);border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:var(--ember);border-radius:3px;"></div></div></div>';
+  }).join('') + '<div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Sulfur remaining in solid: <span class="mono">'+fmt(mb.sRemaining*1000,1)+' mg</span></div>';
+
+  // hypothesis ablation
+  const combos = [];
+  [false,true].forEach(function(h1){ [false,true].forEach(function(h2){ [false,true].forEach(function(h3){ combos.push({h1:h1,h2:h2,h3:h3}); }); }); });
+  const ablRows = combos.map(function(c){
+    const r = runMassBalance(recipe, DEFAULT_PARAMS, c.h1, c.h2, c.h3);
+    return {c:c, gr:r.fracs.graphitic};
+  });
+  const maxGr = Math.max(0.02, Math.max.apply(null, ablRows.map(function(r){return r.gr;})));
+  const ablEl = document.getElementById('ablation-list');
+  ablEl.innerHTML = ablRows.map(function(r){
+    const isCurrent = r.c.h1===hyp.h1 && r.c.h2===hyp.h2 && r.c.h3===hyp.h3;
+    const pct = Math.max(1, r.gr/maxGr*100);
+    return '<div class="ablation-row'+(isCurrent?' current':'')+'">'+
+      '<div class="dots"><span class="'+(r.c.h1?'on':'')+'" title="H1"></span><span class="'+(r.c.h2?'on':'')+'" title="H2"></span><span class="'+(r.c.h3?'on':'')+'" title="H3"></span></div>'+
+      '<div class="track"><div class="fill" style="width:'+pct+'%"></div></div>'+
+      '<div class="fillval">'+fmt(r.gr*100,0)+'%</div></div>';
+  }).join('');
+}
+
+function initSimControls(){
+  [els.fe, els.caco3, els.temp, els.time].forEach(function(el){ el.addEventListener('input', scheduleRender); });
+  [els.h1, els.h2, els.h3].forEach(function(el){ el.addEventListener('change', scheduleRender); });
+  document.getElementById('btn-reset').addEventListener('click', function(){
+    els.fe.value=4; els.caco3.value=0.5; els.temp.value=1000; els.time.value=3;
+    els.h1.checked=true; els.h2.checked=true; els.h3.checked=true;
+    renderAll();
+  });
+  document.getElementById('fit-rmse').textContent = fmt(0.0813,3);
+}
+
+/* ======================================================================
+   SECTION 3 -- CALIBRATION
+====================================================================== */
+function buildCalibration(){
+  const train = CAL.train, test = CAL.test;
+  drawScatterChart(document.getElementById('chart-cal'), {
+    w:480, h:260, xDomain:[-5,105], yDomain:[-5,105],
+    xTicks:[0,25,50,75,100], yTicks:[0,25,50,75,100],
+    xFmt:function(v){return fmt(v,0)+'%';}, yFmt:function(v){return fmt(v,0)+'%';},
+    refLine:[[0,0],[100,100]],
+    series:[
+      {name:'Train (known metric)', x:train.map(function(t){return t.known;}), y:train.map(function(t){return t.known;}),
+       color:cssVar('--steel'), r:3, opacity:0.55,
+       label:function(i){ return 'known '+fmt(train[i].known,0)+'% &middot; metric '+fmt(train[i].metric,3); }},
+      {name:'Held-out prediction', x:test.map(function(t){return t.known;}), y:test.map(function(t){return t.predicted;}),
+       color:cssVar('--ember'), r:5,
+       label:function(i){ return 'known '+fmt(test[i].known,0)+'% &rarr; predicted '+fmt(test[i].predicted,1)+'%'; }},
+    ],
+  });
+  const errs = test.map(function(t){ return Math.abs(t.predicted-t.known); });
+  const mae = errs.reduce(function(a,b){return a+b;},0)/errs.length;
+  document.getElementById('cal-stats').innerHTML =
+    statTile('Held-out MAE', fmt(mae,2)+' wt%', 'target < 5 wt%', true) +
+    statTile('Fit R²', fmt(CAL.r2,3), 'degree-'+CAL.degree+' polynomial');
+}
+
+/* ======================================================================
+   BOOT
+====================================================================== */
+buildGroundTruthCharts();
+initSimControls();
+renderAll();
+buildCalibration();
+
+window.addEventListener('resize', function(){ /* SVGs are viewBox-responsive; no-op */ });
+
+})();
+</script>

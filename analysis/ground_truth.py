@@ -26,11 +26,42 @@ for _p in (_ROOT / "engine", _ROOT / "engine" / "research"):
 
 from run_parser import parse_run_filename  # noqa: E402
 from trends import analyze_dir, make_plots, write_csv  # noqa: E402
+from xrd_analyzer import XRDPattern, calibrate_internal_standard, fit_netl  # noqa: E402
 from yield_calc import compute_from_name  # noqa: E402
 
 DATA_DIR = _ROOT / "DATA"
 MASSES_XLSX = DATA_DIR / "Yield Data Measurements.xlsx"
 OUT_DIR = _ROOT / "outputs"
+
+
+def internal_standard_dg(path: str) -> dict:
+    """Re-fit DG% with an internal-standard 2theta correction.
+
+    Residual Fe / Fe3C / CaO peaks act as an internal standard: their known
+    line positions calibrate out specimen-displacement / zero-offset error that
+    otherwise biases the (002) position — and DG% is ~1.4% per 0.01 deg, so a
+    tenth-of-a-degree offset is the difference between a physical 93% and an
+    impossible 107%. Applies the correction only when the offset is *significant*
+    (>= 0.05 deg, the reference-lattice noise floor); otherwise DG is unchanged.
+    """
+    p = XRDPattern.from_file(path)
+    tt, inten = p.two_theta, p.intensity
+    raw = fit_netl(tt, inten, peak_count=2)
+    cal = calibrate_internal_standard(tt, inten, phase="auto")
+    applied = bool(cal.get("significant"))
+    if applied:
+        corr = fit_netl(tt, inten, peak_count=2, two_theta_offset=-cal["offset"])
+        dg = corr["DG_percent"]
+    else:
+        dg = raw["DG_percent"]
+    return {
+        "DG_percent_raw": round(float(raw["DG_percent"]), 2),
+        "DG_percent": round(float(dg), 2),
+        "internal_standard": cal.get("phase"),
+        "istd_offset_deg": cal.get("offset"),
+        "istd_n_lines": cal.get("n_lines"),
+        "istd_applied": applied,
+    }
 
 
 def recipe_key(name: str) -> tuple | None:
@@ -84,6 +115,17 @@ def build_ground_truth(data_dir: Path = DATA_DIR) -> dict:
     crystalline-graphite yield — the number the project is chasing.
     """
     metrics = analyze_dir(str(data_dir))
+    for m in metrics:
+        # "unlabeled = puck": every run in this dataset was pressed into a puck
+        # unless the filename explicitly says powder, so fill the blank form.
+        if not m.get("form"):
+            m["form"] = "puck"
+        if m.get("error") is None:
+            try:
+                istd = internal_standard_dg(str(data_dir / m["filename"]))
+                m.update(istd)  # overrides DG_percent with the corrected value
+            except (ValueError, FileNotFoundError):
+                pass
     by_key: dict[tuple, dict] = {}
     for m in metrics:
         k = recipe_key(m["filename"])

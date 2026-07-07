@@ -16,6 +16,11 @@ computed from peak *position* only and is blind to how much amorphous carbon
 survives. A sample can read DG ~ 97% while a large mass fraction is still
 disordered. This simulation is built to close that gap.
 
+> **New here?** Read `CLAUDE.md` for the physical assumptions (furnace ramp,
+> atmosphere, feedstock sulfur) and the confirmed-vs-open science before trusting
+> any number. An interactive dashboard (`dashboard/`) lets you drive the whole
+> model from sliders — see **Dashboard** and **Docker** below.
+
 ## Layout
 
 ```
@@ -65,6 +70,60 @@ python3 -m venv .venv
 
 All generated numbers land in `outputs/` (gitignored, since they are derived
 from the confidential DATA/).
+
+## Physical model & assumptions
+
+Fuller detail in `CLAUDE.md`; the load-bearing points:
+
+- **Furnace ramp is modeled.** The pellet heats from 25 °C at 10 °C/min to the
+  setpoint, *then* holds for the dwell time — a 1200 °C / 5 h run is ~2 h of ramp
+  + 5 h of hold. Not modeled: the controller's exact multi-segment profile,
+  cool-down (rates freeze at end of hold), and intra-pellet thermal gradients.
+- **Atmosphere is inert (argon), encoded implicitly.** There is no O₂ / no
+  combustion in the furnace kinetics — carbon leaves only as CO/CO₂ (Boudouard)
+  or as volatiles. Oxidation appears *only* in the predicted TGA step
+  (`sim/tga.py`), which is a separate measurement, not the furnace.
+- **Feedstock is Green Petroleum Coke, ~7 wt% S** (`DEFAULT_COMPOSITION["GPC"]`
+  = 6.5 wt% S, chosen so 0.4063 g CaCO₃ is exactly the 1:1 sulfur match — the
+  experimental threshold anchor). The sulfur load sets the H1 threshold, so this
+  is the single most important composition number.
+- **H1 (sulfur trapping) is confirmed** — without CaCO₃ the high-sulfur coke does
+  not graphitize, and the sharp threshold sits at the 1:1 S:CaCO₃ point.
+  **H2 and H3 are not yet identified** from XRD-only data (their fit parameters
+  rail to bounds). See `CLAUDE.md` for the decisive experiments.
+- **DG% gets an internal-standard 2θ correction** (residual Fe/Fe₃C peaks) in the
+  ground-truth pipeline — a raw scan read an impossible 106.8%; corrected, 93.3%.
+
+## Dashboard
+
+`dashboard/build.py` generates a **single self-contained interactive HTML page**
+(`dashboard/dist/index.html`) — real-data panels plus a live, slider-driven port
+of the kinetics ODE (fixed-step RK4, verified against the Python solver). It runs
+entirely in the browser; no server calls.
+
+```
+.venv/bin/python dashboard/build.py          # writes dashboard/dist/index.html
+open dashboard/dist/index.html                # (macOS) view locally
+```
+
+The generated HTML embeds real run compositions, so it's gitignored — share it
+only within the lab.
+
+## Docker (host & share with the lab)
+
+Serve the dashboard from a container (builds the page at image-build time, serves
+it with nginx on port 8080):
+
+```
+docker compose up --build          # then open http://localhost:8080
+# or without compose:
+docker build -t graphitization-dashboard .
+docker run --rm -p 8080:80 graphitization-dashboard
+```
+
+The build needs `DATA/` present locally (it bakes the real dataset into the page).
+The resulting image is self-contained — share it with the lab via your registry,
+or `docker save` / `docker load` for an offline handoff.
 
 ## Design notes
 
