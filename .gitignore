@@ -1,0 +1,16 @@
+# --- CONFIDENTIAL: never commit (pending patent 63/704,517) ---
+DATA/
+SIMULATION_HANDOFF.md
+
+# generated outputs (contain run-derived numbers)
+outputs/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# os
+.DS_Store
