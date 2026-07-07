@@ -38,6 +38,8 @@ FIELDS = (
     "VOL_out",   # devolatilized mass
     "O_out",     # oxygen released by CaO + S -> CaS + 1/2 O2 (keeps the ledger closed;
                  # yield_calc books the same reaction without conserving the O)
+    "C_burn_out",  # carbon mass lost to O2 combustion (atmosphere not fully inert);
+                   # tracks carbon only (the O2 is external), so the ledger stays closed
 )
 IDX = {name: i for i, name in enumerate(FIELDS)}
 _MASS_FIELDS = tuple(f for f in FIELDS if f != "Q")
@@ -45,13 +47,27 @@ _MASS_FIELDS = tuple(f for f in FIELDS if f != "Q")
 
 @dataclass
 class Recipe:
-    """One experimental run. Masses in grams, temperature in deg C, time in h."""
+    """One experimental run. Masses in grams, temperature in deg C, time in h.
+
+    ``temperature_C`` is the peak/process temperature; ``time_h`` is the process
+    hold (tube furnace) or the total residence time (rotary kiln). ``reactor`` and
+    ``binding`` drive the scale-up model (see sim.schedule and sim.kinetics):
+
+    - reactor: "tube" (multi-segment program with preheat holds + a real hold) or
+      "kiln" (continuous rotary kiln, no isothermal hold, hard 1300 C / 2 h limit).
+    - binding: how Fe is put in contact with the coke — "pellet" (7-ton pressed,
+      baseline), "wet_impregnation" (solution-deposited Fe, finest dispersion),
+      "extrusion" (shaped without high pressure), "dry_mix" (loose powder,
+      pressureless — poorest contact).
+    """
     pc_mass: float
     fe_mass: float
     caco3_mass: float
     temperature_C: float
     time_h: float
     grade: str = "GPC"
+    reactor: str = "tube"
+    binding: str = "pellet"
 
     @property
     def pellet_mass(self) -> float:

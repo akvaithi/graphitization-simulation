@@ -94,6 +94,47 @@ def test_caco3_loading_threshold_emerges():
 
 
 # ---------------------------------------------------------------------------
+# Scale-up: reactor schedule, kiln, O2, binding
+# ---------------------------------------------------------------------------
+def test_kiln_graphitizes_less_than_tube_at_same_peak():
+    """The rotary kiln has no isothermal hold, so far less time-at-temperature:
+    same peak/time should graphitize less than the tube furnace."""
+    tube = run_mass_balance(Recipe(2, 4, 0.5, 1300, 2, reactor="tube"))
+    kiln = run_mass_balance(Recipe(2, 4, 0.5, 1300, 2, reactor="kiln"))
+    assert kiln["carbon"]["phase_fractions"]["graphitic"] < tube["carbon"]["phase_fractions"]["graphitic"]
+
+
+def test_binding_contact_ordering():
+    """Fe-carbon contact: wet impregnation (finest dispersion) > pellet > dry mix."""
+    from sim.kinetics import contact_factor, Params
+    p = Params()
+    c_wet = contact_factor(Recipe(2, 4, 0.5, 1200, 5, binding="wet_impregnation"), p)
+    c_pel = contact_factor(Recipe(2, 4, 0.5, 1200, 5, binding="pellet"), p)
+    c_dry = contact_factor(Recipe(2, 4, 0.5, 1200, 5, binding="dry_mix"), p)
+    assert c_wet > c_pel > c_dry
+
+
+def test_larger_charge_lowers_contact():
+    """Bigger charges have worse heat/mass transfer (Banavath: bigger pellets
+    lowered DG) -- the contact factor should fall with charge mass."""
+    from sim.kinetics import contact_factor, Params
+    p = Params()
+    small = contact_factor(Recipe(2, 4, 0.5, 1200, 5), p)
+    big = contact_factor(Recipe(50, 4, 0.5, 1200, 5), p)
+    assert big < small
+
+
+def test_o2_burns_carbon_and_conserves_mass():
+    """A non-inert atmosphere (o2_frac>0) must lower carbon yield vs pure argon,
+    and the carbon-burn ledger must keep total mass conserved."""
+    from sim.kinetics import Params
+    inert = run_mass_balance(Recipe(2, 4, 0.5, 1200, 5), Params(o2_frac=0.0))
+    airy = run_mass_balance(Recipe(2, 4, 0.5, 1200, 5), Params(o2_frac=0.01))
+    assert airy["yield"]["carbon_yield"] < inert["yield"]["carbon_yield"]
+    assert airy["conservation_error"] < 1e-6
+
+
+# ---------------------------------------------------------------------------
 # Front B: XRD forward model closed loop
 # ---------------------------------------------------------------------------
 def test_xrd_forward_model_recovers_monotonic_index():

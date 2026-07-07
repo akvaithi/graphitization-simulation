@@ -16,9 +16,12 @@ The CO2 released by calcination sits in a transient in-pellet pool that either
 reacts (Boudouard) or escapes with the sweep gas, so Boudouard *efficiency* is
 emergent (temperature- and contact-dependent), not assumed.
 
-Default parameters are hand-tuned to the published anchors (Fe plateau ~50 wt%,
-graphitization onset region, S gone by ~1500 C thermally) and are refined
-against the ground-truth dataset by sim.inference.
+The thermal history comes from sim.schedule (multi-segment tube-furnace program
+with preheat holds, or the hold-free rotary-kiln triangle), and an O2-combustion
+term + a binding-method contact factor drive the scale-up front. Default
+parameters are anchored to the published behaviour (Fe plateau ~50 wt%, sulfur
+threshold, S removal) and refined against the ground-truth dataset by
+sim.inference. Sources for each mechanism are in SOURCES.md.
 """
 from __future__ import annotations
 
@@ -27,12 +30,37 @@ from dataclasses import dataclass, field, replace
 import numpy as np
 from scipy.integrate import solve_ivp
 
+from sim import schedule
 from sim.state import (FIELDS, IDX, M_C, M_CaCO3, M_CaO, M_CaS, M_CO, M_CO2,
                        M_S, Recipe, carbon_mass, initial_state)
 
 R_GAS = 8.314  # J/mol/K
-M_O = M_CaS + 0.0  # placeholder to keep linters quiet; real O mass below
+M_O2 = 31.998
 M_O = M_CaO + M_S - M_CaS  # 15.999 per mol trapped: the O2 leaving in H1
+
+# --- scale-up: Fe-carbon interfacial contact by binding method ----------------
+# Multiplies the graphitization rate. The catalytic step is a dissolution-
+# reprecipitation at the Fe-carbon interface (Banavath 2026; Oya & Marsh 1982), so
+# the intimacy of Fe-carbon contact set by how the charge is prepared is a direct
+# rate lever. Values are hypothesis-level (no scale-up data yet) and adjustable:
+#   pellet           7-ton pressed, intimate contact -- the published baseline.
+#   wet_impregnation Fe deposited from solution -> finest, most homogeneous
+#                    dispersion (Frankenstein 2023; Gomez-Martin biochar 2021).
+#   extrusion        shaped with mixing but far lower pressure than pelletizing
+#                    (FEECO; Zhang solvent-free anode 2022).
+#   dry_mix          loose powder, pressureless -- poorest contact.
+BINDING_CONTACT = {"pellet": 1.0, "wet_impregnation": 1.6, "extrusion": 0.9, "dry_mix": 0.45}
+_REF_MASS_G = 2.0  # charge mass the model is anchored to (all current data is 2 g PC)
+
+
+def contact_factor(recipe: Recipe, p: "Params") -> float:
+    """Effective Fe-carbon contact multiplier for the graphitization rate: the
+    binding-method factor, penalized for larger charges (bigger pellets need
+    longer dwell -- Banavath 2026 saw 1.2->7 g lower DG 97.7->94.1%)."""
+    base = BINDING_CONTACT.get(recipe.binding, 1.0)
+    over = max(0.0, (recipe.pc_mass - _REF_MASS_G) / _REF_MASS_G)
+    mass_penalty = 1.0 / (1.0 + p.contact_mass_k * over)
+    return base * mass_penalty
 
 
 @dataclass
@@ -65,12 +93,21 @@ class Params:
     k0_trap: float = 100.0       # 1/(g CaO * min); fast once CaO exists and T > onset
     Ea_trap: float = 80e3
     # Fe poisoning by free sulfur: rate *= 1 / (1 + p_poison * S/Fe). Strong by
-    # default: with GPC (4.5 wt% S) the CaO from 0.25 g CaCO3 is substoichiometric
-    # to sulfur, so free S survives and kills ordering — the observed threshold.
+    # default: with high-sulfur GPC (~6.5 wt% S) the CaO from a sub-1:1 CaCO3 dose
+    # is substoichiometric to sulfur, so free S survives and kills ordering — the
+    # observed threshold (Sharma sulfur-poisoning; Majumder CaO trapping).
     p_poison: float = 800.0
-    # furnace
-    ramp_C_per_min: float = 10.0
-    T0_C: float = 25.0
+    # oxygen combustion (C + O2 -> CO2): default o2_frac=0 -> fully inert argon.
+    # Raise o2_frac to explore an imperfectly-sealed / non-inert atmosphere (scale-
+    # up). Amorphous carbon oxidizes preferentially (o2_alpha), like Boudouard.
+    o2_frac: float = 0.0         # mole fraction O2 in the sweep gas (0 = pure Ar)
+    k0_o2: float = 1.5e5
+    Ea_o2: float = 165e3
+    o2_alpha: float = 6.0        # amorphous/graphitic O2-burn selectivity
+    # scale-up: charge-mass penalty on Fe-carbon contact (see contact_factor)
+    contact_mass_k: float = 0.06
+    # furnace schedule (see sim.schedule; ramp/preheats live there)
+    T0_C: float = schedule.T_ROOM_C
     # acid wash removal efficiencies
     eta_wash_fe: float = 0.97
     eta_wash_ca: float = 0.97
@@ -87,17 +124,9 @@ def _arrh(k0: float, Ea: float, T_K: float) -> float:
     return k0 * np.exp(-Ea / (R_GAS * T_K))
 
 
-def temperature_K(t_min: float, recipe: Recipe, p: Params) -> float:
-    """Furnace schedule: linear ramp then isothermal hold (cool-down neglected —
-    rates are frozen within minutes of leaving the hold temperature)."""
-    T_hold = recipe.temperature_C
-    t_ramp = (T_hold - p.T0_C) / p.ramp_C_per_min
-    T_C = p.T0_C + p.ramp_C_per_min * min(t_min, t_ramp)
-    return T_C + 273.15
-
-
-def rhs(t: float, y: np.ndarray, recipe: Recipe, p: Params) -> np.ndarray:
-    T = temperature_K(t, recipe, p)
+def rhs(t: float, y: np.ndarray, program: "schedule.TemperatureProgram",
+        p: Params, contact: float = 1.0) -> np.ndarray:
+    T = program.T_K_at(t)
     d = np.zeros_like(y)
     g = lambda name: max(y[IDX[name]], 0.0)  # noqa: E731
 
@@ -142,7 +171,7 @@ def rhs(t: float, y: np.ndarray, recipe: Recipe, p: Params) -> np.ndarray:
         u = g("CaO") / solids
         disp += p.h3_gain * u / (u + p.h3_uhalf)
     poison = 1.0 / (1.0 + p.p_poison * (g("S") / g("Fe"))) if g("Fe") > 0 else 0.0
-    k_g = _arrh(p.k0_graph, p.Ea_graph, T) * f_fe * disp * poison
+    k_g = _arrh(p.k0_graph, p.Ea_graph, T) * f_fe * disp * poison * contact
     r_am = k_g * C_am
     r_tg = p.gamma_turb * k_g * C_turb
     d[IDX["C_am"]] -= r_am
@@ -150,6 +179,22 @@ def rhs(t: float, y: np.ndarray, recipe: Recipe, p: Params) -> np.ndarray:
     d[IDX["C_gr"]] += r_tg
     # ordering coordinate of the graphitic phase (drives peak position / Lc)
     d[IDX["Q"]] = p.q_gain * k_g * (1.0 - min(y[IDX["Q"]], 1.0))
+
+    # --- oxygen combustion (only if the atmosphere is not fully inert) --------
+    # C + O2 -> CO2. O2 is externally supplied (flowing gas), so first-order in
+    # the reactive carbon and proportional to the O2 fraction; amorphous carbon
+    # burns preferentially (o2_alpha), the same reactivity ordering TGA burn-off
+    # exploits (Lu 2001). Only the carbon mass is booked (the O2 is external), so
+    # the closed-ledger mass balance is preserved.
+    if p.o2_frac > 0.0 and C_tot > 0.0:
+        wo_am, wo_turb, wo_gr = p.o2_alpha * C_am, np.sqrt(p.o2_alpha) * C_turb, C_gr
+        wo_sum = wo_am + wo_turb + wo_gr
+        r_burn = _arrh(p.k0_o2, p.Ea_o2, T) * p.o2_frac * wo_sum
+        if wo_sum > 0:
+            d[IDX["C_am"]] -= r_burn * (wo_am / wo_sum)
+            d[IDX["C_turb"]] -= r_burn * (wo_turb / wo_sum)
+            d[IDX["C_gr"]] -= r_burn * (wo_gr / wo_sum)
+        d[IDX["C_burn_out"]] += r_burn
 
     # --- sulfur ---------------------------------------------------------------
     r_sgas = _arrh(p.k0_sgas, p.Ea_sgas, T) * g("S")
@@ -166,24 +211,28 @@ def rhs(t: float, y: np.ndarray, recipe: Recipe, p: Params) -> np.ndarray:
 
 
 def simulate(recipe: Recipe, p: Params, c_wt: float, s_wt: float,
-             n_eval: int = 200) -> dict:
-    """Integrate the pellet through ramp + hold. Returns the trajectory and the
-    final state; downstream modules (massbalance, xrd_forward, tga) read from
-    this dict rather than re-integrating."""
+             n_eval: int = 240) -> dict:
+    """Integrate the pellet through the full reactor program (sim.schedule) —
+    ramp, preheat holds, process hold, and cooling for the tube furnace, or the
+    hold-free ramp/cool triangle for the rotary kiln. Returns the trajectory and
+    the final state; downstream modules read from this dict rather than
+    re-integrating."""
+    prog = schedule.program_for(recipe.reactor, recipe.temperature_C, recipe.time_h)
+    contact = contact_factor(recipe, p)
     y0 = initial_state(recipe, c_wt, s_wt)
-    t_ramp = (recipe.temperature_C - p.T0_C) / p.ramp_C_per_min
-    t_end = t_ramp + recipe.time_h * 60.0
+    t_end = prog.total_min
     t_eval = np.linspace(0.0, t_end, n_eval)
-    sol = solve_ivp(rhs, (0.0, t_end), y0, args=(recipe, p), method="LSODA",
-                    t_eval=t_eval, rtol=1e-8, atol=1e-10)
+    sol = solve_ivp(rhs, (0.0, t_end), y0, args=(prog, p, contact), method="LSODA",
+                    t_eval=t_eval, rtol=1e-8, atol=1e-10, max_step=5.0)
     if not sol.success:
         raise RuntimeError(f"ODE integration failed: {sol.message}")
     yf = np.clip(sol.y[:, -1], 0.0, None)
     yf[IDX["Q"]] = min(sol.y[IDX["Q"], -1], 1.0)
     return {
         "recipe": recipe, "params": p, "c_wt": c_wt, "s_wt": s_wt,
+        "program": prog, "contact": contact,
         "t_min": sol.t, "traj": sol.y, "y0": y0, "y_final": yf,
-        "T_K": np.array([temperature_K(t, recipe, p) for t in sol.t]),
+        "T_K": np.array([prog.T_K_at(t) for t in sol.t]),
     }
 
 

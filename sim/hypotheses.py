@@ -61,6 +61,70 @@ def quality_yield_tradeoff(temperature_C: float = 1200, time_h: float = 5,
     return rows
 
 
+def h2_carbon_yield_test(params: Params | None = None,
+                         temperature_C: float = 1200, time_h: float = 5,
+                         fe_mass: float = 4.0, pc_mass: float = 2.0,
+                         caco3_range=(0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.5)) -> dict:
+    """The decisive H2 test the requester asked for: does carbon yield DROP as
+    CaCO3 rises (H2 real: Boudouard gasifies carbon) or stay FLAT (against H2)?
+
+    Returns the model's carbon-yield-vs-CaCO3 curves with H2 ON vs OFF, so the
+    signature is explicit, plus the slope (yield per gram CaCO3) under H2 ON.
+    Overlay measured points via ``attach_measured``. Boudouard carbon loss and its
+    preference for reactive/amorphous carbon are established (Guo *Fuel* 2021;
+    the reverse-Boudouard reactivity literature) — the open question is only
+    *how much* it operates here, which the yield slope quantifies.
+    """
+    p = params or Params()
+    on, off = [], []
+    for caco3 in caco3_range:
+        recipe = Recipe(pc_mass, fe_mass, caco3, temperature_C, time_h)
+        mb_on = run_mass_balance(recipe, p.with_hypotheses(p.H1, True, p.H3))
+        mb_off = run_mass_balance(recipe, p.with_hypotheses(p.H1, False, p.H3))
+        on.append({"caco3_mass": caco3, "carbon_yield": mb_on["yield"]["carbon_yield"]})
+        off.append({"caco3_mass": caco3, "carbon_yield": mb_off["yield"]["carbon_yield"]})
+    xs = [r["caco3_mass"] for r in on]
+    ys = [r["carbon_yield"] for r in on]
+    n = len(xs)
+    mean_x = sum(xs) / n
+    mean_y = sum(ys) / n
+    denom = sum((x - mean_x) ** 2 for x in xs) or 1.0
+    slope = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys)) / denom
+    return {"h2_on": on, "h2_off": off,
+            "yield_slope_per_g_caco3_h2on": slope,
+            "interpretation": ("negative slope => H2 (Boudouard) is costing carbon; "
+                               "flat (~0) => the yield data does not support H2 here"),
+            "conditions": {"fe_mass": fe_mass, "temperature_C": temperature_C,
+                           "time_h": time_h, "pc_mass": pc_mass}}
+
+
+def attach_measured_yields(mass_rows: list[dict]) -> list[dict]:
+    """Turn ground-truth mass rows into measured carbon-recovery points for the
+    H2 plot: carbon recovered / feed carbon vs CaCO3 loading. The 6 rows do not
+    cleanly isolate CaCO3 (Fe/time vary too), so these are context for the model
+    curve, not a controlled sweep — flagged per point with its Fe/time."""
+    from run_parser import parse_run_filename
+    from yield_calc import masses_from_name
+    out = []
+    for r in mass_rows:
+        if r.get("error") or not r.get("result"):
+            continue
+        res = r["result"]
+        chem = res["chemistry"]
+        yld = res["yield"]
+        pr = parse_run_filename(r["sample"])
+        m = masses_from_name(r["sample"], res["inputs"]["pellet"])
+        feed_c = chem.get("actual_C")
+        surv_c = yld.get("measured_C_after_furnace")
+        if not feed_c or surv_c is None:
+            continue
+        out.append({"caco3_mass": (m or {}).get("caco3_mass"),
+                    "carbon_recovery": surv_c / feed_c,
+                    "fe": pr.get("fe_ratio"), "time_h": pr.get("time_h"),
+                    "sample": r["sample"]})
+    return out
+
+
 def caco3_threshold_scan(fe_mass: float = 4.0, temperature_C: float = 1200,
                          time_h: float = 5, pc_mass: float = 2.0,
                          caco3_range=None) -> list[dict]:

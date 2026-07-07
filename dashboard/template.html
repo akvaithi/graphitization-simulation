@@ -173,6 +173,18 @@
   .toggle-copy .name{ font-size: 13px; font-weight: 600; color: var(--ink); }
   .toggle-copy .desc{ font-size: 11.5px; color: var(--ink-muted); line-height: 1.4; margin-top: 1px; }
 
+  .segmented{ display:flex; gap:4px; background: var(--paper-sunken); border-radius:5px; padding:3px; }
+  .segmented button{
+    flex:1; font-family: var(--font-body); font-size:12px; font-weight:600; color: var(--ink-muted);
+    background: transparent; border:none; border-radius:3px; padding:6px 4px; cursor:pointer; white-space:nowrap;
+  }
+  .segmented button[aria-pressed="true"]{ background: var(--ember); color:#fff; }
+  :root[data-theme="dark"] .segmented button[aria-pressed="true"], @media (prefers-color-scheme: dark){ .segmented button[aria-pressed="true"]{ color: var(--paper); } }
+  .segmented button:focus-visible{ outline: 2px solid var(--focus); outline-offset:1px; }
+  .segmented.four button{ font-size:11px; padding:6px 2px; }
+  .limit-note{ font-size:11px; color:var(--warn); margin-top:6px; font-family:var(--font-mono); display:none; }
+  .limit-note.show{ display:block; }
+
   button.reset-btn{
     font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.03em; text-transform: uppercase;
     background: transparent; border: 1px solid var(--line-strong); color: var(--ink-soft);
@@ -249,6 +261,10 @@
   .ablation-row .fillval{ font-family: var(--font-mono); font-size: 11px; text-align:right; color: var(--ink-soft); }
   .ablation-row.current .fillval{ color: var(--ember-ink); font-weight:700; }
 
+  ul.src-list{ margin: 0; padding-left: 16px; font-size: 12.5px; color: var(--ink-soft); line-height: 1.55; }
+  ul.src-list li{ margin-bottom: 7px; }
+  ul.src-list li i{ color: var(--ink-muted); }
+
   .foot-note{ margin-top: 60px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--ink-muted); font-size: 12px; line-height:1.6; }
   .foot-note code{ font-family: var(--font-mono); background: var(--paper-sunken); padding: 1px 5px; border-radius:3px; }
 
@@ -299,7 +315,7 @@
   <section class="block" id="sec-sim">
     <div class="block-head">
       <h2>2&nbsp;&middot;&nbsp;Drive the model</h2>
-      <div class="desc">A mass-conserving ODE (devolatilization &rarr; calcination &rarr; Boudouard etch &rarr; Fe-catalyzed graphitization &rarr; sulfur trapping &rarr; acid wash), running live in your browser with kinetics fit to the dataset above (RMSE <span class="mono" id="fit-rmse">&mdash;</span> on 26 residuals).</div>
+      <div class="desc">A mass-conserving ODE (devolatilization &rarr; calcination &rarr; Boudouard etch &rarr; Fe-catalyzed graphitization &rarr; sulfur trapping &rarr; acid wash) over the real furnace program, running live in your browser (RMSE <span class="mono" id="fit-rmse">&mdash;</span>, 26 residuals). Switch to the <b>rotary kiln</b> and change the <b>charge size</b>, <b>Fe&ndash;carbon binding</b>, and <b>O&#8322;</b> to explore scale-up.</div>
     </div>
 
     <div class="sim-grid">
@@ -319,10 +335,40 @@
             <input type="range" id="s-temp" min="900" max="1400" step="10" value="1000">
           </div>
           <div class="control">
-            <label>Hold time <span class="val"><span id="v-time">2.0</span>&nbsp;h</span></label>
+            <label><span id="lab-time">Hold time</span> <span class="val"><span id="v-time">2.0</span>&nbsp;h</span></label>
             <input type="range" id="s-time" min="0" max="13" step="1" value="3">
           </div>
           <div class="recipe-readout" id="recipe-readout">2.0 g PC</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Reactor &amp; scale-up</div>
+          <div class="card-sub">Tube furnace (lab, multi-segment program) vs. the rotary kiln (scale-up: hard 1300&nbsp;&deg;C / 2&nbsp;h, no isothermal hold).</div>
+          <div class="control">
+            <label>Reactor</label>
+            <div class="segmented" id="seg-reactor" role="group" aria-label="Reactor">
+              <button data-val="tube" aria-pressed="true">Tube furnace</button>
+              <button data-val="kiln" aria-pressed="false">Rotary kiln</button>
+            </div>
+            <div class="limit-note" id="kiln-note">Kiln limits applied: peak &le; 1300&nbsp;&deg;C, residence &le; 2&nbsp;h, no hold.</div>
+          </div>
+          <div class="control">
+            <label>Sample charge (PC) <span class="val"><span id="v-mass">2.0</span>&nbsp;g</span></label>
+            <input type="range" id="s-mass" min="2" max="100" step="2" value="2">
+          </div>
+          <div class="control">
+            <label>Fe&ndash;carbon binding</label>
+            <div class="segmented four" id="seg-binding" role="group" aria-label="Binding method">
+              <button data-val="pellet" aria-pressed="true">Pellet</button>
+              <button data-val="wet_impregnation" aria-pressed="false">Wet imp.</button>
+              <button data-val="extrusion" aria-pressed="false">Extrude</button>
+              <button data-val="dry_mix" aria-pressed="false">Dry mix</button>
+            </div>
+          </div>
+          <div class="control">
+            <label>O&#8322; in atmosphere <span class="val"><span id="v-o2">0.0</span>&nbsp;%</span></label>
+            <input type="range" id="s-o2" min="0" max="2" step="0.05" value="0">
+          </div>
         </div>
 
         <div class="card">
@@ -350,9 +396,14 @@
         <div class="stat-row" id="stat-tiles"></div>
 
         <div class="content-grid">
-          <div class="card span2">
-            <div class="card-title">Phase evolution across the furnace run</div>
-            <div class="card-sub">Carbon-phase mass fraction vs. time, ramp + isothermal hold.</div>
+          <div class="card">
+            <div class="card-title">Temperature program</div>
+            <div class="card-sub" id="prog-sub">Tube furnace: preheat holds &rarr; process hold &rarr; cooling.</div>
+            <div id="chart-program"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Phase evolution</div>
+            <div class="card-sub">Carbon-phase mass fraction vs. time over the whole program.</div>
             <div id="chart-evolution"></div>
             <div class="legend">
               <span class="item"><span class="swatch" style="background:var(--ochre)"></span>Amorphous</span>
@@ -383,11 +434,26 @@
             <div id="chart-ledger"></div>
           </div>
 
-          <div class="card span2">
+          <div class="card">
             <div class="card-title">Hypothesis ablation, this recipe</div>
             <div class="card-sub">All 8 combinations of H1/H2/H3 &mdash; final graphitic mass fraction. Current toggle state highlighted.</div>
             <div class="ablation-bars" id="ablation-list"></div>
           </div>
+          <div class="card">
+            <div class="card-title">H2 test &middot; carbon yield vs. CaCO&#8323;</div>
+            <div class="card-sub">H2's signature is a <i>yield cost</i>: if Boudouard etching is real, carbon yield falls as CaCO&#8323; rises. Model H2 on (ember) vs off (steel); measured runs as points (context &mdash; not a controlled sweep).</div>
+            <div id="chart-h2"></div>
+            <div class="legend">
+              <span class="item"><span class="swatch line" style="background:var(--ember)"></span>H2 on (etching)</span>
+              <span class="item"><span class="swatch line" style="background:var(--steel)"></span>H2 off</span>
+              <span class="item"><span class="swatch" style="background:var(--ink-muted)"></span>Measured</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout" id="scaleup-callout" style="background:var(--steel-soft); border-color:var(--steel);">
+          <div class="num" id="scaleup-num" style="color:var(--steel)">&mdash;</div>
+          <p id="scaleup-text">&mdash;</p>
         </div>
       </div>
     </div>
@@ -420,11 +486,52 @@
     </div>
   </section>
 
+  <!-- ============================================================ -->
+  <!-- SECTION 4 : SOURCES                                           -->
+  <!-- ============================================================ -->
+  <section class="block" id="sec-sources">
+    <div class="block-head">
+      <h2>4&nbsp;&middot;&nbsp;What backs each claim</h2>
+      <div class="desc">Every mechanism in the model is grounded in the literature (full list + DOIs in <code>SOURCES.md</code>). The key ones:</div>
+    </div>
+    <div class="content-grid">
+      <div class="card">
+        <div class="card-title">Process &amp; Fe catalysis</div>
+        <ul class="src-list">
+          <li>Banavath et&nbsp;al., <i>npj Materials Sustainability</i> <b>4</b>:23 (2026) &mdash; the ≤1600&nbsp;&deg;C Fe-catalyzed route; Fe plateau ~50&nbsp;wt%.</li>
+          <li>AIChE 2025 (paper 693e) &mdash; the fuel-grade (high-sulfur) extension.</li>
+          <li>Fe-catalyzed graphitization of isotropic carbon, <i>Carbon</i> (1983) &mdash; dissolution&ndash;reprecipitation via Fe carbide.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">H1 sulfur trapping &middot; H2 Boudouard</div>
+        <ul class="src-list">
+          <li>Poisoning of iron catalyst by sulfur, <i>Appl. Catal. A</i> (2007) &mdash; H&#8322;S retards graphite growth on Fe.</li>
+          <li>Majumder et&nbsp;al. (2023) &mdash; ~10&nbsp;wt% CaO traps free sulfur in pet coke as CaS.</li>
+          <li>Guo et&nbsp;al., <i>Fuel</i> (2021) &mdash; Boudouard gasifies carbon while ordering the rest; amorphous carbon reacts preferentially.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">Scale-up: kiln, binding, O&#8322;</div>
+        <ul class="src-list">
+          <li>Sunkara et&nbsp;al., <i>Powder Technol.</i> (2009) &mdash; carbon rotary-kiln residence times (short, hold-free).</li>
+          <li>Pet-coke calcining practice &mdash; 1150&ndash;1350&nbsp;&deg;C, oxygen-deficient (not fully inert).</li>
+          <li>Frankenstein (2023) &amp; Fe-impregnated biochar &mdash; wet impregnation gives the finest Fe dispersion.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
   <p class="foot-note">
     Kinetics fit against 17 real XRD scans + 6 weighed mass-balance rows (least squares, RMSE noted above).
-    The in-browser simulator re-integrates the same ODE system with a fixed-step RK4 (<code>dt = 0.05 min</code>,
-    verified against the reference LSODA solver) so every slider move runs entirely client-side &mdash; nothing
-    here calls out to a server. Real recipe compositions are shown because this page is private to you.
+    The tube-furnace program reproduces the group's actual C01&ndash;T10 controller schedule (preheat holds at
+    300/800/1200&nbsp;&deg;C, process hold, programmed + natural cooling); the rotary kiln is modeled as a
+    hold-free ramp/cool triangle over the residence time. The in-browser simulator re-integrates the same ODE
+    system with a fixed-step RK4, verified numerically identical to the reference LSODA solver across the
+    temperature / CaCO&#8323; / reactor / binding / O&#8322; grid, so every control runs entirely client-side &mdash;
+    nothing calls out to a server. Scale-up levers (kiln, sample charge, binding method, O&#8322;) are predictive:
+    they encode literature-grounded mechanisms (see &sect;4 and <code>SOURCES.md</code>) but have no scale-up
+    data to fit yet. Real recipe compositions are shown because this page is private to your lab.
   </p>
 </div>
 
@@ -448,18 +555,25 @@ function cssVar(name){ return getComputedStyle(document.documentElement).getProp
 const GT = JSON.parse(document.getElementById('gt-metrics-data').textContent);
 const CAL = JSON.parse(document.getElementById('cal-data').textContent);
 const FITTED_PARAMS = __FITTED_PARAMS__;
+const FIT_RMSE = __FIT_RMSE__;
+const H2_MEASURED = __H2_MEASURED__;  // measured carbon-recovery points (context for the H2 panel)
 
 /* ======================================================================
-   KINETICS  (faithful port of sim/kinetics.py + sim/state.py)
+   KINETICS  (faithful port of sim/kinetics.py + sim/state.py + sim/schedule.py)
+   Verified numerically identical to the Python LSODA reference (build notes).
 ====================================================================== */
 const FIELDS = ["C_am","C_turb","C_gr","S","VOL","CaCO3","CaO","CaS","Fe","Q",
-                "CO2_pool","CO2_out","CO_out","S_out","VOL_out","O_out"];
+                "CO2_pool","CO2_out","CO_out","S_out","VOL_out","O_out","C_burn_out"];
 const IDX = {}; FIELDS.forEach((f,i)=>IDX[f]=i);
 const NF = FIELDS.length;
 
 const M_C=12.011, M_CaCO3=100.086, M_CaO=56.077, M_S=32.06, M_CaS=72.138, M_CO2=44.009, M_CO=28.01;
 const M_O = M_CaO + M_S - M_CaS;
 const R_GAS = 8.314;
+const T_ROOM_C = 25.0, RAMP_C_PER_MIN = 5.0, FIRST_RAMP_MIN = 40.0, COOL_TO_C = 500.0, NATURAL_COOL_MIN = 90.0;
+const PREHEATS = [[300,20],[800,20],[1200,20]];  // (T_C, hold_min)
+const BINDING_CONTACT = {pellet:1.0, wet_impregnation:1.6, extrusion:0.9, dry_mix:0.45};
+const REF_MASS_G = 2.0;
 
 const BASE_PARAMS = {
   k0_dev:1.7e3, Ea_dev:60e3,
@@ -470,22 +584,54 @@ const BASE_PARAMS = {
   h3_gain:2.0, h3_uhalf:0.02,
   k0_sgas:4.6e5, Ea_sgas:250e3, k0_trap:100.0, Ea_trap:80e3,
   p_poison:800.0, alpha_H2:8.0,
-  ramp_C_per_min:10.0, T0_C:25.0,
-  eta_wash_fe:0.97, eta_wash_ca:0.97,
+  k0_o2:1.5e5, Ea_o2:165e3, o2_alpha:6.0, contact_mass_k:0.06,
+  T0_C:25.0, eta_wash_fe:0.97, eta_wash_ca:0.97,
 };
 const DEFAULT_PARAMS = Object.assign({}, BASE_PARAMS, FITTED_PARAMS);
 const C_WT = __C_WT__, S_WT = __S_WT__; // GPC composition, injected from engine at build time
 
 function arrh(k0, Ea, T){ return k0*Math.exp(-Ea/(R_GAS*T)); }
 
-function temperatureK(tMin, recipe, p){
-  const tRamp = (recipe.T - p.T0_C)/p.ramp_C_per_min;
-  const T_C = p.T0_C + p.ramp_C_per_min*Math.min(tMin, tRamp);
-  return T_C + 273.15;
+// --- temperature program (sim/schedule.py) --------------------------------
+function _programBreakpoints(reactor, peakC, timeH){
+  // returns {t:[min], T:[degC]} piecewise-linear breakpoints
+  if(reactor==="kiln"){
+    // rotary kiln: RT -> peak -> RT over the residence time, NO isothermal hold
+    const res = timeH*60, up = 0.5*res;
+    return {t:[0, up, res], T:[T_ROOM_C, peakC, T_ROOM_C]};
+  }
+  // tube furnace: preheat holds below peak, process hold, programmed + natural cool
+  const t=[0], T=[T_ROOM_C]; let prevT=T_ROOM_C, first=true;
+  for(const [Tph,holdMin] of PREHEATS){
+    if(Tph >= peakC-1e-6) continue;
+    const dur = first?FIRST_RAMP_MIN:Math.abs(Tph-prevT)/RAMP_C_PER_MIN;
+    t.push(t[t.length-1]+dur); T.push(Tph);       // ramp to preheat
+    t.push(t[t.length-1]+holdMin); T.push(Tph);   // preheat hold
+    prevT=Tph; first=false;
+  }
+  const dur = first?FIRST_RAMP_MIN:Math.abs(peakC-prevT)/RAMP_C_PER_MIN;
+  t.push(t[t.length-1]+dur); T.push(peakC);       // ramp to peak
+  t.push(t[t.length-1]+timeH*60); T.push(peakC);  // process hold
+  t.push(t[t.length-1]+Math.abs(peakC-COOL_TO_C)/RAMP_C_PER_MIN); T.push(COOL_TO_C); // programmed cool
+  t.push(t[t.length-1]+NATURAL_COOL_MIN); T.push(T_ROOM_C);  // natural cool
+  return {t, T};
+}
+function _interpT(prog, tMin){
+  const t=prog.t, T=prog.T, n=t.length;
+  if(tMin<=t[0]) return T[0];
+  if(tMin>=t[n-1]) return T[n-1];
+  let i=1; while(i<n && t[i]<tMin) i++;
+  const f=(tMin-t[i-1])/((t[i]-t[i-1])||1);
+  return T[i-1]+f*(T[i]-T[i-1]);
+}
+function contactFactor(recipe, p){
+  const base = BINDING_CONTACT[recipe.binding] !== undefined ? BINDING_CONTACT[recipe.binding] : 1.0;
+  const over = Math.max(0, (recipe.pc - REF_MASS_G)/REF_MASS_G);
+  return base / (1.0 + p.contact_mass_k*over);
 }
 
-function rhs(t, y, recipe, p, h1, h2, h3, out){
-  const T = temperatureK(t, recipe, p);
+function rhs(t, y, prog, p, h1, h2, h3, contact, out){
+  const T = _interpT(prog, t) + 273.15;
   out.fill(0);
   const g = (i)=> y[i] > 0 ? y[i] : 0;
   const C_am=g(IDX.C_am), C_turb=g(IDX.C_turb), C_gr=g(IDX.C_gr);
@@ -520,7 +666,7 @@ function rhs(t, y, recipe, p, h1, h2, h3, out){
   }
   out[IDX.CO_out] += r_boud + c_etch;
 
-  // graphitization (Fe-catalyzed dissolution-reprecipitation)
+  // graphitization (Fe-catalyzed dissolution-reprecipitation), scaled by contact
   const fe_frac = solids>0 ? Fe/solids : 0;
   const f_fe = fe_frac>0 ? fe_frac/(p.K_fe+fe_frac) : 0;
   let disp = 1.0;
@@ -529,13 +675,26 @@ function rhs(t, y, recipe, p, h1, h2, h3, out){
     disp += p.h3_gain*u/(u+p.h3_uhalf);
   }
   const poison = Fe>0 ? 1.0/(1.0+p.p_poison*(S/Fe)) : 0.0;
-  const k_g = arrh(p.k0_graph,p.Ea_graph,T)*f_fe*disp*poison;
+  const k_g = arrh(p.k0_graph,p.Ea_graph,T)*f_fe*disp*poison*contact;
   const r_am = k_g*C_am;
   const r_tg = p.gamma_turb*k_g*C_turb;
   out[IDX.C_am] -= r_am;
   out[IDX.C_turb] += r_am - r_tg;
   out[IDX.C_gr] += r_tg;
   out[IDX.Q] = p.q_gain*k_g*(1.0 - Math.min(y[IDX.Q],1.0));
+
+  // oxygen combustion (only if atmosphere is not fully inert)
+  if(p.o2_frac > 0 && C_tot > 0){
+    const wo_am=p.o2_alpha*C_am, wo_turb=Math.sqrt(p.o2_alpha)*C_turb, wo_gr=C_gr;
+    const wo_sum=wo_am+wo_turb+wo_gr;
+    const r_burn = arrh(p.k0_o2,p.Ea_o2,T)*p.o2_frac*wo_sum;
+    if(wo_sum>0){
+      out[IDX.C_am] -= r_burn*(wo_am/wo_sum);
+      out[IDX.C_turb] -= r_burn*(wo_turb/wo_sum);
+      out[IDX.C_gr] -= r_burn*(wo_gr/wo_sum);
+    }
+    out[IDX.C_burn_out] += r_burn;
+  }
 
   // sulfur: thermal release + H1 trapping
   const r_sgas = arrh(p.k0_sgas,p.Ea_sgas,T)*S;
@@ -560,35 +719,37 @@ function initialState(recipe){
   return y;
 }
 
-// fixed-step RK4, dt=0.05 min -- verified against scipy LSODA across the full
-// T/CaCO3 grid (see build notes); state is clamped >=0 each step (Q in [0,1]).
+// fixed-step RK4 -- verified against scipy LSODA across the T/CaCO3/reactor grid.
+// dt=0.1 min (schedules run 120-710 min; the preheat holds are 20 min wide so
+// this resolves them); state clamped >=0 each step (Q in [0,1]).
 function integrate(recipe, p, h1, h2, h3, dt, maxPoints){
-  dt = dt || 0.05; maxPoints = maxPoints || 160;
+  dt = dt || 0.1; maxPoints = maxPoints || 200;
+  const prog = _programBreakpoints(recipe.reactor, recipe.T, recipe.timeH);
+  const contact = contactFactor(recipe, p);
   const y0 = initialState(recipe);
-  const tRamp = (recipe.T - p.T0_C)/p.ramp_C_per_min;
-  const tEnd = tRamp + recipe.timeH*60;
+  const tEnd = prog.t[prog.t.length-1];
   const n = Math.max(1, Math.ceil(tEnd/dt));
   const step = tEnd/n;
   const keepEvery = Math.max(1, Math.floor(n/maxPoints));
   let y = Float64Array.from(y0);
   const k1=new Float64Array(NF), k2=new Float64Array(NF), k3=new Float64Array(NF), k4=new Float64Array(NF), tmp=new Float64Array(NF);
-  const times=[0], traj=[Array.from(y0)];
+  const times=[0], traj=[Array.from(y0)], temps=[_interpT(prog,0)];
   for(let i=0;i<n;i++){
     const t = i*step;
-    rhs(t,y,recipe,p,h1,h2,h3,k1);
+    rhs(t,y,prog,p,h1,h2,h3,contact,k1);
     for(let j=0;j<NF;j++) tmp[j]=y[j]+step/2*k1[j];
-    rhs(t+step/2,tmp,recipe,p,h1,h2,h3,k2);
+    rhs(t+step/2,tmp,prog,p,h1,h2,h3,contact,k2);
     for(let j=0;j<NF;j++) tmp[j]=y[j]+step/2*k2[j];
-    rhs(t+step/2,tmp,recipe,p,h1,h2,h3,k3);
+    rhs(t+step/2,tmp,prog,p,h1,h2,h3,contact,k3);
     for(let j=0;j<NF;j++) tmp[j]=y[j]+step*k3[j];
-    rhs(t+step,tmp,recipe,p,h1,h2,h3,k4);
+    rhs(t+step,tmp,prog,p,h1,h2,h3,contact,k4);
     for(let j=0;j<NF;j++){
       let v = y[j] + step/6*(k1[j]+2*k2[j]+2*k3[j]+k4[j]);
       y[j] = (j===IDX.Q) ? Math.min(Math.max(v,0),1) : Math.max(v,0);
     }
-    if((i+1)%keepEvery===0 || i===n-1){ times.push((i+1)*step); traj.push(Array.from(y)); }
+    if((i+1)%keepEvery===0 || i===n-1){ times.push((i+1)*step); traj.push(Array.from(y)); temps.push(_interpT(prog,(i+1)*step)); }
   }
-  return {times, traj, y0:Array.from(y0), yFinal:Array.from(y)};
+  return {times, traj, temps, program:prog, contact, y0:Array.from(y0), yFinal:Array.from(y)};
 }
 
 function runMassBalance(recipe, p, h1, h2, h3){
@@ -605,7 +766,8 @@ function runMassBalance(recipe, p, h1, h2, h3){
   return {
     pellet: recipe.pc+recipe.fe+recipe.caco3, postFurnace, postAcid,
     carbonYield: feedC>0 ? carbon/feedC : 0, fracs, orderingQ: y[IDX.Q],
-    trajectory: res, sRemaining: y[IDX.S],
+    trajectory: res, sRemaining: y[IDX.S], contact: res.contact,
+    burnedC: y[IDX.C_burn_out], graphiteMass: y[IDX.C_gr], feedC: feedC,
   };
 }
 
@@ -744,6 +906,12 @@ function drawLineChart(container, cfg){
     body += '<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="'+s.color+'" stroke="var(--paper-raised)" stroke-width="1.5"/>';
   });
 
+  // optional overlay points (e.g. measured data over model curves)
+  (cfg.overlayPoints||[]).forEach(function(pt){
+    const cx=axes.X(pt.x), cy=axes.Y(pt.y);
+    body += '<circle cx="'+cx+'" cy="'+cy+'" r="4" fill="var(--ink-muted)" stroke="var(--paper-raised)" stroke-width="1.2"/>';
+  });
+
   body += '<rect class="hover-catch" x="'+m.l+'" y="'+m.t+'" width="'+(w-m.l-m.r)+'" height="'+(h-m.t-m.b)+'" fill="transparent"/>';
   container.innerHTML = svgOpen(w,h)+body+'</svg>';
 
@@ -852,17 +1020,28 @@ function buildGroundTruthCharts(){
    SECTION 2 -- SIMULATOR WIRING
 ====================================================================== */
 const TIME_STEPS = [0.25,0.5,1,2,3,4,5,6,8,10,12,16,20,24];
+const KILN_MAX_T = 1300, KILN_MAX_H = 2.0;
 const els = {
   fe: document.getElementById('s-fe'), caco3: document.getElementById('s-caco3'),
   temp: document.getElementById('s-temp'), time: document.getElementById('s-time'),
+  mass: document.getElementById('s-mass'), o2: document.getElementById('s-o2'),
   h1: document.getElementById('t-h1'), h2: document.getElementById('t-h2'), h3: document.getElementById('t-h3'),
   vfe: document.getElementById('v-fe'), vcaco3: document.getElementById('v-caco3'),
   vtemp: document.getElementById('v-temp'), vtime: document.getElementById('v-time'),
+  vmass: document.getElementById('v-mass'), vo2: document.getElementById('v-o2'),
 };
+let reactorVal = 'tube', bindingVal = 'pellet';
 
 function currentRecipe(){
-  return { pc:2.0, fe:parseFloat(els.fe.value), caco3:parseFloat(els.caco3.value),
-           T:parseFloat(els.temp.value), timeH:TIME_STEPS[parseInt(els.time.value,10)] };
+  let T = parseFloat(els.temp.value);
+  let timeH = TIME_STEPS[parseInt(els.time.value,10)];
+  if(reactorVal === 'kiln'){ T = Math.min(T, KILN_MAX_T); timeH = Math.min(timeH, KILN_MAX_H); }
+  return { pc:parseFloat(els.mass.value), fe:parseFloat(els.fe.value),
+           caco3:parseFloat(els.caco3.value), T:T, timeH:timeH,
+           reactor:reactorVal, binding:bindingVal };
+}
+function currentParams(){
+  return Object.assign({}, DEFAULT_PARAMS, {o2_frac: parseFloat(els.o2.value)/100.0});
 }
 function currentHyp(){ return {h1:els.h1.checked, h2:els.h2.checked, h3:els.h3.checked}; }
 
@@ -874,34 +1053,51 @@ let rafPending = false;
 function scheduleRender(){ if(rafPending) return; rafPending = true; requestAnimationFrame(function(){ rafPending=false; renderAll(); }); }
 
 function renderAll(){
-  const recipe = currentRecipe(), hyp = currentHyp();
+  const recipe = currentRecipe(), hyp = currentHyp(), params = currentParams();
+  const isKiln = recipe.reactor === 'kiln';
   els.vfe.textContent = fmt(recipe.fe,1);
   els.vcaco3.textContent = fmt(recipe.caco3,2);
   els.vtemp.textContent = fmt(recipe.T,0);
   els.vtime.textContent = fmt(recipe.timeH,2);
+  els.vmass.textContent = fmt(recipe.pc,0);
+  els.vo2.textContent = fmt(params.o2_frac*100,1);
+  document.getElementById('lab-time').textContent = isKiln ? 'Residence time' : 'Hold time';
+  document.getElementById('kiln-note').classList.toggle('show', isKiln);
+  document.getElementById('prog-sub').innerHTML = isKiln
+    ? 'Rotary kiln: ramp to peak &rarr; immediate cool. <b>No isothermal hold</b> — the scale-up challenge.'
+    : 'Tube furnace: preheat holds &rarr; process hold &rarr; programmed + natural cooling.';
   document.getElementById('recipe-readout').innerHTML =
-    '<b>'+fmt(recipe.pc,1)+' g</b> PC &middot; <b>'+fmt(recipe.fe,1)+' g</b> Fe &middot; <b>'+fmt(recipe.caco3,2)+' g</b> CaCO₃ &middot; <b>'+fmt(recipe.T,0)+' °C</b> &middot; <b>'+fmt(recipe.timeH,2)+' h</b>';
+    '<b>'+fmt(recipe.pc,0)+' g</b> PC &middot; <b>'+fmt(recipe.fe,1)+' g</b> Fe &middot; <b>'+fmt(recipe.caco3,2)+' g</b> CaCO₃ &middot; <b>'+fmt(recipe.T,0)+' °C</b> &middot; <b>'+fmt(recipe.timeH,2)+' h</b> &middot; '+(isKiln?'kiln':'tube')+' &middot; '+recipe.binding.replace('_',' ');
 
-  const mb = runMassBalance(recipe, DEFAULT_PARAMS, hyp.h1, hyp.h2, hyp.h3);
+  const mb = runMassBalance(recipe, params, hyp.h1, hyp.h2, hyp.h3);
   const f = mb.fracs;
 
   // stat tiles
   document.getElementById('stat-tiles').innerHTML =
     statTile('Ordering Q', fmt(mb.orderingQ*100,0)+'%', 'graphitic-lattice coordinate', true) +
     statTile('Graphitic mass', fmt(f.graphitic*100,0)+'%', 'of surviving carbon') +
-    statTile('Carbon yield', fmt(mb.carbonYield*100,0)+'%', 'vs. feed carbon') +
-    statTile('Post-furnace', fmt(mb.postFurnace,3)+' g', 'from '+fmt(mb.pellet,2)+' g pellet') +
+    statTile('Carbon yield', fmt(mb.carbonYield*100,0)+'%', (params.o2_frac>0?'incl. O₂ burn':'vs. feed carbon')) +
+    statTile('Fe contact', fmt(mb.contact,2)+'×', recipe.binding.replace('_',' ')+', '+fmt(recipe.pc,0)+' g') +
     statTile('Post-acid', fmt(mb.postAcid,3)+' g', 'washed product');
 
-  // phase evolution chart
+  // temperature program chart
   const traj = mb.trajectory;
+  const tHrsP = traj.times.map(function(t){ return t/60; });
+  drawLineChart(document.getElementById('chart-program'), {
+    w:500, h:200, xDomain:[0, tHrsP[tHrsP.length-1]||1], yDomain:[0,1500],
+    yTicks:[0,500,1000,1500], xFmt:function(v){return fmt(v,1)+'h';}, yFmt:function(v){return fmt(v,0)+'°';},
+    tipTitle:function(v){ return 't = '+fmt(v,2)+' h'; }, tipFmt:function(v){return fmt(v,0)+' °C';},
+    series:[{name:'Temperature', x:tHrsP, y:traj.temps, color:cssVar('--ochre'), area:true}],
+  });
+
+  // phase evolution chart
   const tHrs = traj.times.map(function(t){ return t/60; });
   const totC = traj.traj.map(function(y){ return y[IDX.C_am]+y[IDX.C_turb]+y[IDX.C_gr]; });
   const amPct = traj.traj.map(function(y,i){ return totC[i]>0? y[IDX.C_am]/totC[i]*100 : 0; });
   const tbPct = traj.traj.map(function(y,i){ return totC[i]>0? y[IDX.C_turb]/totC[i]*100 : 0; });
   const grPct = traj.traj.map(function(y,i){ return totC[i]>0? y[IDX.C_gr]/totC[i]*100 : 0; });
   drawLineChart(document.getElementById('chart-evolution'), {
-    w:1040, h:230, xDomain:[0,tHrs[tHrs.length-1]||1], yDomain:[0,100],
+    w:500, h:200, xDomain:[0,tHrs[tHrs.length-1]||1], yDomain:[0,100],
     yTicks:[0,25,50,75,100], xFmt:function(v){return fmt(v,1)+'h';}, yFmt:function(v){return fmt(v,0)+'%';},
     tipTitle:function(v){ return 't = '+fmt(v,2)+' h'; }, tipFmt:function(v){return fmt(v,1)+'%';},
     series:[
@@ -944,17 +1140,18 @@ function renderAll(){
     {label:'Post-acid (product)', val:mb.postAcid},
   ];
   const maxV = mb.pellet;
+  const burnRow = params.o2_frac>0 ? '<div style="font-size:11.5px;color:var(--critical);margin-top:2px;">Carbon burned by O₂: <span class="mono">'+fmt(mb.burnedC,3)+' g</span></div>' : '';
   ledgerEl.innerHTML = stages.map(function(s){
     const pct = Math.max(2, s.val/maxV*100);
     return '<div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);margin-bottom:4px;"><span>'+s.label+'</span><span class="mono">'+fmt(s.val,3)+' g</span></div>'+
       '<div style="height:10px;background:var(--paper-sunken);border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:var(--ember);border-radius:3px;"></div></div></div>';
-  }).join('') + '<div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Sulfur remaining in solid: <span class="mono">'+fmt(mb.sRemaining*1000,1)+' mg</span></div>';
+  }).join('') + '<div style="font-size:11.5px;color:var(--ink-muted);margin-top:2px;">Sulfur remaining in solid: <span class="mono">'+fmt(mb.sRemaining*1000,1)+' mg</span></div>' + burnRow;
 
-  // hypothesis ablation
+  // hypothesis ablation (uses current params incl. O2)
   const combos = [];
   [false,true].forEach(function(h1){ [false,true].forEach(function(h2){ [false,true].forEach(function(h3){ combos.push({h1:h1,h2:h2,h3:h3}); }); }); });
   const ablRows = combos.map(function(c){
-    const r = runMassBalance(recipe, DEFAULT_PARAMS, c.h1, c.h2, c.h3);
+    const r = runMassBalance(recipe, params, c.h1, c.h2, c.h3);
     return {c:c, gr:r.fracs.graphitic};
   });
   const maxGr = Math.max(0.02, Math.max.apply(null, ablRows.map(function(r){return r.gr;})));
@@ -967,17 +1164,75 @@ function renderAll(){
       '<div class="track"><div class="fill" style="width:'+pct+'%"></div></div>'+
       '<div class="fillval">'+fmt(r.gr*100,0)+'%</div></div>';
   }).join('');
+
+  renderH2Panel(recipe, params);
+  renderScaleupCallout(recipe, params, hyp, mb);
+}
+
+// H2 test: model carbon-yield-vs-CaCO3 (H2 on vs off) + measured points
+function renderH2Panel(recipe, params){
+  const caRange = [0,0.2,0.4,0.6,0.8,1.0,1.2];
+  const on=[], off=[];
+  caRange.forEach(function(ca){
+    const rc = Object.assign({}, recipe, {caco3:ca});
+    on.push(runMassBalance(rc, Object.assign({},params,{o2_frac:0}), true, true, true).carbonYield*100);
+    off.push(runMassBalance(rc, Object.assign({},params,{o2_frac:0}), true, false, true).carbonYield*100);
+  });
+  const measX = H2_MEASURED.map(function(m){return m.caco3;});
+  const measY = H2_MEASURED.map(function(m){return m.recovery*100;});
+  const yLo = Math.min.apply(null, on.concat(off, measY, [80]))-3;
+  drawLineChart(document.getElementById('chart-h2'), {
+    w:500, h:210, xDomain:[0,1.25], yDomain:[Math.max(0,yLo),102],
+    xTicks:[0,0.4,0.8,1.2], xFmt:function(v){return fmt(v,1);}, yFmt:function(v){return fmt(v,0)+'%';},
+    tipTitle:function(v){ return fmt(v,2)+' g CaCO₃'; }, tipFmt:function(v){return fmt(v,1)+'%';},
+    series:[
+      {name:'H2 off', x:caRange, y:off, color:cssVar('--steel')},
+      {name:'H2 on (etching)', x:caRange, y:on, color:cssVar('--ember')},
+    ],
+    overlayPoints: measX.map(function(x,i){ return {x:x, y:measY[i], label:H2_MEASURED[i].sample}; }),
+  });
+}
+
+function renderScaleupCallout(recipe, params, hyp, mb){
+  // compare the current recipe in the tube furnace vs the kiln to quantify the
+  // hold penalty, and show whether a better binding recovers it.
+  const tubeRc = Object.assign({}, recipe, {reactor:'tube'});
+  const kilnRc = Object.assign({}, recipe, {reactor:'kiln', T:Math.min(recipe.T,KILN_MAX_T), timeH:Math.min(recipe.timeH,KILN_MAX_H)});
+  const gTube = runMassBalance(tubeRc, params, hyp.h1,hyp.h2,hyp.h3).fracs.graphitic;
+  const gKiln = runMassBalance(kilnRc, params, hyp.h1,hyp.h2,hyp.h3).fracs.graphitic;
+  const kilnWet = runMassBalance(Object.assign({},kilnRc,{binding:'wet_impregnation'}), params, hyp.h1,hyp.h2,hyp.h3).fracs.graphitic;
+  document.getElementById('scaleup-num').textContent = fmt(gTube*100,0)+'% → '+fmt(gKiln*100,0)+'%';
+  document.getElementById('scaleup-text').innerHTML =
+    'Same recipe, <b>tube furnace vs. rotary kiln</b>: graphitic mass drops from <b>'+fmt(gTube*100,0)+'%</b> to <b>'+fmt(gKiln*100,0)+'%</b> — the kiln has no isothermal hold, so far less time at temperature. '+
+    'Switching the kiln charge to <b>wet impregnation</b> recovers it to <b>'+fmt(kilnWet*100,0)+'%</b> (finer Fe–carbon contact). Try the reactor and binding controls to explore the scale-up window.';
+}
+
+function wireSegmented(groupId, onPick){
+  const group = document.getElementById(groupId);
+  group.querySelectorAll('button').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      group.querySelectorAll('button').forEach(function(b){ b.setAttribute('aria-pressed', b===btn ? 'true':'false'); });
+      onPick(btn.getAttribute('data-val'));
+      scheduleRender();
+    });
+  });
 }
 
 function initSimControls(){
-  [els.fe, els.caco3, els.temp, els.time].forEach(function(el){ el.addEventListener('input', scheduleRender); });
+  [els.fe, els.caco3, els.temp, els.time, els.mass, els.o2].forEach(function(el){ el.addEventListener('input', scheduleRender); });
   [els.h1, els.h2, els.h3].forEach(function(el){ el.addEventListener('change', scheduleRender); });
+  wireSegmented('seg-reactor', function(v){ reactorVal = v; });
+  wireSegmented('seg-binding', function(v){ bindingVal = v; });
   document.getElementById('btn-reset').addEventListener('click', function(){
     els.fe.value=4; els.caco3.value=0.5; els.temp.value=1000; els.time.value=3;
+    els.mass.value=2; els.o2.value=0;
     els.h1.checked=true; els.h2.checked=true; els.h3.checked=true;
+    reactorVal='tube'; bindingVal='pellet';
+    document.querySelectorAll('#seg-reactor button').forEach(function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-val')==='tube'?'true':'false'); });
+    document.querySelectorAll('#seg-binding button').forEach(function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-val')==='pellet'?'true':'false'); });
     renderAll();
   });
-  document.getElementById('fit-rmse').textContent = fmt(0.0813,3);
+  document.getElementById('fit-rmse').textContent = fmt(FIT_RMSE,3);
 }
 
 /* ======================================================================

@@ -73,26 +73,32 @@ from the confidential DATA/).
 
 ## Physical model & assumptions
 
-Fuller detail in `CLAUDE.md`; the load-bearing points:
+Fuller detail in `CLAUDE.md`, and every claim is cited in `SOURCES.md`. The
+load-bearing points:
 
-- **Furnace ramp is modeled.** The pellet heats from 25 °C at 10 °C/min to the
-  setpoint, *then* holds for the dwell time — a 1200 °C / 5 h run is ~2 h of ramp
-  + 5 h of hold. Not modeled: the controller's exact multi-segment profile,
-  cool-down (rates freeze at end of hold), and intra-pellet thermal gradients.
-- **Atmosphere is inert (argon), encoded implicitly.** There is no O₂ / no
-  combustion in the furnace kinetics — carbon leaves only as CO/CO₂ (Boudouard)
-  or as volatiles. Oxidation appears *only* in the predicted TGA step
-  (`sim/tga.py`), which is a separate measurement, not the furnace.
+- **The full furnace program is modeled** (`sim/schedule.py`). The tube furnace
+  reproduces the group's real multi-segment controller schedule — preheat holds
+  at 300/800/1200 °C, the process hold, then programmed + natural cooling (the
+  1400 °C / 2 h program is reproduced exactly). The **rotary kiln** (scale-up) is
+  a hold-free RT→peak→RT triangle over the residence time, with hard limits of
+  1300 °C and 2 h.
+- **Atmosphere is argon by default** (`o2_frac = 0`, no combustion) — carbon
+  leaves only as CO/CO₂ (Boudouard) or volatiles. An **O₂ slider** turns on a
+  combustion term to explore a non-inert / imperfectly-sealed atmosphere at scale.
+- **Scale-up levers** (predictive, no data yet): reactor (tube/kiln), sample
+  charge (>2 g), Fe–carbon binding (pellet / wet impregnation / extrusion / dry
+  mix), and O₂. The kiln's missing hold predicts a large graphitization penalty
+  that finer Fe contact (wet impregnation) and higher Fe partly recover.
 - **Feedstock is Green Petroleum Coke, ~7 wt% S** (`DEFAULT_COMPOSITION["GPC"]`
   = 6.5 wt% S, chosen so 0.4063 g CaCO₃ is exactly the 1:1 sulfur match — the
-  experimental threshold anchor). The sulfur load sets the H1 threshold, so this
-  is the single most important composition number.
+  experimental threshold anchor). The sulfur load sets the H1 threshold.
 - **H1 (sulfur trapping) is confirmed** — without CaCO₃ the high-sulfur coke does
   not graphitize, and the sharp threshold sits at the 1:1 S:CaCO₃ point.
-  **H2 and H3 are not yet identified** from XRD-only data (their fit parameters
-  rail to bounds). See `CLAUDE.md` for the decisive experiments.
-- **DG% gets an internal-standard 2θ correction** (residual Fe/Fe₃C peaks) in the
-  ground-truth pipeline — a raw scan read an impossible 106.8%; corrected, 93.3%.
+  **H2 and H3 are not yet identified** from XRD-only data (fit parameters rail to
+  bounds). The **H2 test panel** in the dashboard folds in the measured carbon
+  yields: H2 would show a yield cost as CaCO₃ rises.
+- **DG% gets an internal-standard 2θ correction** (residual Fe/Fe₃C peaks) — a
+  raw scan read an impossible 106.8%; corrected, 93.3%.
 
 ## Dashboard
 

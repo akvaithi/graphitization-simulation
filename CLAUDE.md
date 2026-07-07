@@ -19,8 +19,9 @@ scientific brief is `SIMULATION_HANDOFF.md` (confidential, gitignored).
 engine/      ported analyzer (github.com/akvaithi/xrd-graphitization-analyzer):
              DG% engine, crystallinity index, calibration, yield chemistry.
              Flat imports — `import xrd_analyzer`, `from _shared import ...`.
-sim/         the simulation (state, kinetics ODE, mass balance, xrd forward,
-             calibration, tga, hypotheses, inference, __main__ CLI).
+sim/         the simulation (state, schedule, kinetics ODE, mass balance, xrd
+             forward, calibration, tga, hypotheses, inference, __main__ CLI).
+SOURCES.md   every mechanism/assumption -> a citation (for defending to a PI).
 analysis/    ground_truth.py — runs the engine on all real scans + joins masses.
 dashboard/   build.py + template.html -> a self-contained interactive HTML page.
 tests/       pytest suite (engine + research + sim).
@@ -44,34 +45,49 @@ it must stay numerically identical to the upstream analyzer + its Swift parity.
 
 ## The physical model — assumptions to know before trusting a number
 
-### Furnace schedule (`sim/kinetics.py: temperature_K`, `simulate`)
-- **A ramp IS modeled.** The pellet heats from `T0_C = 25 °C` at
-  `ramp_C_per_min = 10 °C/min` up to the recipe setpoint, **then** holds
-  isothermally. The dwell clock (`time_h`) starts *after* the ramp finishes, so
-  a 1200 °C / 5 h run integrates ~117 min of ramp + 300 min of hold.
-- **Simplifications, on purpose:** (1) the ramp is a single linear rate, not the
-  tube furnace's actual multi-segment controller profile; (2) **cool-down is not
-  modeled** — rates are effectively frozen at the end of the hold (ordering does
-  not un-happen on cooling, and it's kinetically frozen within minutes of leaving
-  temperature, so this is a safe omission for the final state, though it means the
-  model can't speak to quench-rate effects); (3) no thermal-gradient / pellet-core
-  vs surface distinction — the pellet is treated as isothermal at each instant.
-- To fit a real controller profile, replace `temperature_K` with a piecewise
-  schedule; nothing else in `rhs` assumes linearity.
+### Furnace schedule (`sim/schedule.py`, used by `sim/kinetics.py: simulate`)
+Two reactor modes, both full multi-segment programs (piecewise-linear T(t)):
+- **Tube furnace** (`reactor="tube"`, default) — reproduces the group's real
+  C01..T10 controller program: RT → **preheat holds** at 300/800/1200 °C (20 min
+  each, only those below the peak) → ramp to the process peak → **process hold**
+  (`time_h`) → **programmed cooling** (5 °C/min to 500 °C) → **natural cooling**.
+  The 1400 °C / 2 h example is reproduced exactly. The preheat holds matter:
+  calcination and sulfur trapping begin during the 800 °C hold, not only at peak.
+- **Rotary kiln** (`reactor="kiln"`) — the scale-up reactor. **No isothermal
+  hold**: a triangular RT → peak → RT profile over the residence time (true
+  residence time, not time-on-stream). Hard limits enforced in the dashboard:
+  peak ≤ 1300 °C, residence ≤ 2 h. Because there is no hold, the same peak
+  graphitizes far less than in the tube furnace — the central scale-up finding.
+- **Still simplified:** single linear ramp *rate* between segments (not the exact
+  controller curve); no intra-pellet thermal gradient; the kiln triangle is a
+  modeling assumption (Sunkara 2009) — heat_frac is adjustable in `schedule.py`.
 
-### Atmosphere (inert / argon) — **implicit, by omission of O₂**
-- The furnace runs under argon. In the model this is encoded as **the absence of
-  any combustion term**: in `rhs`, carbon can only leave the solid via the
-  **Boudouard reaction** (`C + CO₂ → 2 CO`) and volatiles via devolatilization.
-  There is **no O₂ / no burning** anywhere in the furnace kinetics. If you ever
-  model an air leak or an oxidizing sweep, add an O₂-driven `C + O₂ → CO₂` term.
-- The one place oxidation appears is **`sim/tga.py` (Front C)** — but that is a
-  *separate, predicted* TGA measurement (burning the washed product in air to
-  split amorphous vs graphitic by oxidation temperature), NOT the furnace step.
-- Gas leaves the pellet through a transient in-pellet **CO₂ pool** that either
-  reacts (Boudouard) or escapes with the sweep gas (`k_esc`), so Boudouard
-  *efficiency* is emergent, not assumed. Argon flow rate is not a parameter;
-  it is subsumed into `k_esc`.
+### Atmosphere (argon by default; optional O₂ for scale-up)
+- The lab furnace runs under argon → default `o2_frac = 0`, i.e. **no combustion**:
+  carbon leaves only via **Boudouard** (`C + CO₂ → 2 CO`) and volatiles.
+- **`o2_frac > 0` turns on an O₂-combustion term** (`C + O₂ → CO₂`, amorphous-
+  selective) for exploring a non-inert / imperfectly-sealed atmosphere at scale
+  (real calcining kilns are "oxygen-deficient," not inert). Only the carbon mass
+  is booked (to `C_burn_out`) since the O₂ is external, so the closed-ledger mass
+  balance still holds. This is a **predictive knob** (no O₂ data) — a slider in
+  the dashboard. It is separate from **`sim/tga.py`** (Front C), which burns the
+  *washed product* in air to split amorphous vs graphitic — a measurement, not the
+  furnace.
+- Gas leaves via a transient in-pellet **CO₂ pool** (reacts via Boudouard or
+  escapes at `k_esc`), so Boudouard *efficiency* is emergent. Argon flow is
+  subsumed into `k_esc`.
+
+### Scale-up model (`sim/kinetics.py: contact_factor`, `BINDING_CONTACT`)
+The catalytic step is a dissolution–reprecipitation at the Fe–carbon interface, so
+**how the charge is prepared sets a direct rate multiplier** (`contact`):
+- `binding` ∈ {`pellet` 1.0 (pressed baseline), `wet_impregnation` 1.6 (finest Fe
+  dispersion), `extrusion` 0.9 (shaped, low pressure), `dry_mix` 0.45 (loose
+  powder, pressureless)} — values are **hypothesis-level** (no scale-up data),
+  adjustable, and sourced in SOURCES.md §6.
+- `pc_mass > 2 g` applies a heat/mass-transfer penalty (`contact_mass_k`) — bigger
+  charges graphitize less (Banavath saw it for bigger pellets).
+- These do not touch the tube-furnace fit (defaults: `pellet`, 2 g, `o2_frac=0` →
+  `contact=1`), so the fit stays clean while scale-up stays exploratory.
 
 ### Feedstock composition — GPC, sulfur stoichiometry
 - All runs use **Green Petroleum Coke (GPC)**, measured **~7 wt% S** (very high —
@@ -140,5 +156,12 @@ ledger.
   using fixed-step RK4 (`dt = 0.05 min`), verified numerically identical to the
   Python LSODA reference across the T/CaCO₃ grid. If you change `rhs`, update the
   JS port in `dashboard/template.html` and re-verify.
-- Roadmap: **scale-up studies** are the next front (details forthcoming) — expect
-  new inputs for larger charges / pellet sizes / bed effects.
+- **Sources over math when explaining.** The PI weighs citations heavily, so
+  documentation and the dashboard justify claims from the literature (SOURCES.md),
+  not from the equations. Keep this: when adding a mechanism, add its citation to
+  SOURCES.md and reference it, rather than only writing the rate law.
+- Roadmap: the **scale-up front** (rotary kiln, larger charges, pressureless
+  binding methods, O₂) is now in the model as a *predictive* layer awaiting data;
+  more scale-up specifics are forthcoming. The kiln's hold-free profile predicts a
+  large graphitization penalty that better Fe–carbon contact (wet impregnation)
+  and higher Fe partly recover — the main scale-up lever to validate at the bench.

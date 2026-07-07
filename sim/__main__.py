@@ -85,6 +85,33 @@ def cmd_ablate(args):
              f"{r['carbon_yield']:6.3f} {r['sulfur_remaining_g']:7.4f}")
 
 
+def cmd_scaleup(args):
+    """Scale-up comparison: the same recipe in the tube furnace vs the rotary
+    kiln, across binding methods and charge sizes (front: scale-up)."""
+    from sim.kinetics import Recipe
+    from sim.massbalance import run_mass_balance
+    params = _load_fitted_params()
+    peak, t = args.temperature, args.time
+    # Scale Fe and CaCO3 WITH the PC charge (keep ratios) so the comparison
+    # isolates the reactor/binding/scale effect, not a sub-stoichiometric-additive
+    # artifact (scaling PC alone would starve the sulfur trap and kill H1).
+    fe_r, ca_r = args.fe / args.pc, args.caco3 / args.pc
+    print(f"Recipe ratios: Fe/PC={fe_r:.2f}, CaCO3/PC={ca_r:.3f}, peak {peak} C, {t} h "
+          f"(additives scale with charge)\n")
+    print(f"{'reactor':>6} {'binding':>17} {'charge':>7} | {'gr%':>6} {'Q%':>5} {'Cyield%':>8}")
+    for reactor in ("tube", "kiln"):
+        for binding in ("pellet", "wet_impregnation", "extrusion", "dry_mix"):
+            for mass in (args.pc, args.pc * 10):
+                r = Recipe(mass, fe_r * mass, ca_r * mass, peak, t,
+                           reactor=reactor, binding=binding)
+                mb = run_mass_balance(r, params)
+                f = mb["carbon"]["phase_fractions"]
+                print(f"{reactor:>6} {binding:>17} {mass:6.0f}g | {f['graphitic']*100:6.1f} "
+                     f"{mb['carbon']['ordering_q']*100:5.0f} {mb['yield']['carbon_yield']*100:8.1f}")
+    print("\n(kiln has no isothermal hold -> the peak alone graphitizes far less; "
+          "finer Fe-carbon binding is the main lever. See SOURCES.md.)")
+
+
 def cmd_report(args):
     OUT_DIR.mkdir(exist_ok=True)
     print("== ground truth ==")
@@ -110,6 +137,13 @@ def main():
     ap_ablate.add_argument("--temperature", type=float, default=1200.0)
     ap_ablate.add_argument("--time", type=float, default=5.0)
     ap_ablate.set_defaults(func=cmd_ablate)
+    ap_scale = sub.add_parser("scaleup")
+    ap_scale.add_argument("--pc", type=float, default=2.0)
+    ap_scale.add_argument("--fe", type=float, default=4.0)
+    ap_scale.add_argument("--caco3", type=float, default=1.0)
+    ap_scale.add_argument("--temperature", type=float, default=1300.0)
+    ap_scale.add_argument("--time", type=float, default=2.0)
+    ap_scale.set_defaults(func=cmd_scaleup)
     sub.add_parser("report").set_defaults(func=cmd_report)
 
     args = ap.parse_args()

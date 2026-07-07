@@ -22,6 +22,7 @@ from analysis.ground_truth import build_ground_truth  # noqa: E402
 from calibration import apply_calibration, norm_002_area  # noqa: E402
 from sim import feedstock  # noqa: E402
 from sim.calibration_sim import _blend_pattern, build_calibration  # noqa: E402
+from sim.hypotheses import attach_measured_yields  # noqa: E402
 
 TEMPLATE = Path(__file__).resolve().parent / "template.html"
 DIST = Path(__file__).resolve().parent / "dist"
@@ -65,23 +66,33 @@ def calibration_payload() -> dict:
     return {"train": train, "test": test, "r2": round(cal["r2"], 4), "degree": cal["degree"]}
 
 
+def h2_measured_payload() -> list[dict]:
+    """Measured carbon-recovery points for the H2 panel (context, not a sweep)."""
+    gt = build_ground_truth()
+    rows = attach_measured_yields(gt["yields"])
+    return [{"caco3": round(r["caco3_mass"], 4), "recovery": round(r["carbon_recovery"], 4),
+             "sample": f"{r['fe']:.0f}Fe · {r['time_h']:.2g}h"}
+            for r in rows if r.get("caco3_mass") is not None and r.get("carbon_recovery") is not None]
+
+
 def main() -> Path:
-    fitted = json.loads(FITTED_PARAMS.read_text())["fitted_values"] if FITTED_PARAMS.exists() else {}
-    rmse = json.loads(FITTED_PARAMS.read_text()).get("rmse") if FITTED_PARAMS.exists() else None
-    html = TEMPLATE.read_text()
+    meta = json.loads(FITTED_PARAMS.read_text()) if FITTED_PARAMS.exists() else {}
+    fitted = meta.get("fitted_values", {})
+    rmse = meta.get("rmse", 0.08)
     c_wt, s_wt = feedstock.composition("GPC")
+    html = TEMPLATE.read_text()
     html = html.replace("__GT_METRICS__", json.dumps(metrics_payload()))
     html = html.replace("__CAL_DATA__", json.dumps(calibration_payload()))
     html = html.replace("__FITTED_PARAMS__", json.dumps(fitted))
+    html = html.replace("__FIT_RMSE__", repr(float(rmse)))
+    html = html.replace("__H2_MEASURED__", json.dumps(h2_measured_payload()))
     html = html.replace("__C_WT__", repr(float(c_wt)))
     html = html.replace("__S_WT__", repr(float(s_wt)))
-    if rmse is not None:
-        html = html.replace("fmt(0.0813,3)", "fmt(%.6f,3)" % rmse)
     DIST.mkdir(exist_ok=True)
     out = DIST / "index.html"
     out.write_text(html)
     left = [t for t in ("__GT_METRICS__", "__CAL_DATA__", "__FITTED_PARAMS__",
-                        "__C_WT__", "__S_WT__") if t in html]
+                        "__FIT_RMSE__", "__H2_MEASURED__", "__C_WT__", "__S_WT__") if t in html]
     assert not left, f"unfilled placeholders: {left}"
     print(f"wrote {out}  ({len(html):,} bytes)")
     return out
