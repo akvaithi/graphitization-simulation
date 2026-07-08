@@ -322,13 +322,14 @@
       <div class="rail">
         <div class="card">
           <div class="card-title">Recipe</div>
+          <div class="card-sub">Fe and CaCO&#8323; are set as ratios to the coke, so they scale with the charge (throughput is set below).</div>
           <div class="control">
-            <label>Fe catalyst <span class="val"><span id="v-fe">4.0</span>&nbsp;g</span></label>
-            <input type="range" id="s-fe" min="0.5" max="10" step="0.5" value="4">
+            <label>Fe loading <span class="val"><span id="v-fe">2.0</span>&times; PC</span></label>
+            <input type="range" id="s-fe" min="0.25" max="5" step="0.25" value="2">
           </div>
           <div class="control">
-            <label>CaCO&#8323; additive <span class="val"><span id="v-caco3">0.50</span>&nbsp;g</span></label>
-            <input type="range" id="s-caco3" min="0" max="1.2" step="0.05" value="0.5">
+            <label>CaCO&#8323; loading <span class="val"><span id="v-caco3">0.25</span>&times; PC</span></label>
+            <input type="range" id="s-caco3" min="0" max="0.6" step="0.01" value="0.25">
           </div>
           <div class="control">
             <label>Furnace temperature <span class="val"><span id="v-temp">1000</span>&nbsp;&deg;C</span></label>
@@ -376,6 +377,7 @@
           <div class="control">
             <label>O&#8322; in atmosphere <span class="val"><span id="v-o2">0.0</span>&nbsp;%</span></label>
             <input type="range" id="s-o2" min="0" max="2" step="0.05" value="0">
+            <div class="limit-note show" style="color:var(--ink-muted)">O&#8322; burns amorphous carbon first, so it <b>raises the graphitic fraction</b> but <b>lowers the graphite yield</b> (grams) &mdash; oxidative burn-off, not more graphite. Watch both tiles.</div>
           </div>
         </div>
 
@@ -1059,8 +1061,12 @@ function currentRecipe(){
   let T = parseFloat(els.temp.value);
   let timeH = TIME_STEPS[parseInt(els.time.value,10)];
   if(reactorVal === 'kiln'){ T = Math.min(T, KILN_MAX_T); timeH = Math.min(timeH, KILN_MAX_H); }
-  return { pc:parseFloat(els.mass.value), fe:parseFloat(els.fe.value),
-           caco3:parseFloat(els.caco3.value), T:T, timeH:timeH,
+  const pc = parseFloat(els.mass.value);
+  const feRatio = parseFloat(els.fe.value), caRatio = parseFloat(els.caco3.value);
+  // Fe and CaCO3 scale WITH the charge (ratios fixed) so stoichiometry is
+  // preserved at any throughput -- only heat transfer (cross-section) penalizes scale.
+  return { pc:pc, fe:feRatio*pc, caco3:caRatio*pc, feRatio:feRatio, caRatio:caRatio,
+           T:T, timeH:timeH,
            reactor:reactorVal, binding:bindingVal, geometry:geometryVal, char_dim_mm:null };
 }
 function currentParams(){
@@ -1078,8 +1084,8 @@ function scheduleRender(){ if(rafPending) return; rafPending = true; requestAnim
 function renderAll(){
   const recipe = currentRecipe(), hyp = currentHyp(), params = currentParams();
   const isKiln = recipe.reactor === 'kiln';
-  els.vfe.textContent = fmt(recipe.fe,1);
-  els.vcaco3.textContent = fmt(recipe.caco3,2);
+  els.vfe.textContent = fmt(recipe.feRatio,2);
+  els.vcaco3.textContent = fmt(recipe.caRatio,2);
   els.vtemp.textContent = fmt(recipe.T,0);
   els.vtime.textContent = fmt(recipe.timeH,2);
   els.vmass.textContent = fmt(recipe.pc,0);
@@ -1090,18 +1096,19 @@ function renderAll(){
     ? 'Rotary kiln: fast entry &rarr; <b>isothermal hold</b> (hot-zone traverse) &rarr; fast cool. Grey = gas; ember = material (lags by its thermal time constant).'
     : 'Tube furnace: preheat holds &rarr; process hold &rarr; cooling. Grey = gas; ember = material.';
   document.getElementById('recipe-readout').innerHTML =
-    '<b>'+fmt(recipe.pc,0)+' g</b> PC &middot; <b>'+fmt(recipe.fe,1)+' g</b> Fe &middot; <b>'+fmt(recipe.caco3,2)+' g</b> CaCO\u2083 &middot; <b>'+fmt(recipe.T,0)+' \u00b0C</b> &middot; <b>'+fmt(recipe.timeH,2)+' h</b> &middot; '+(isKiln?'kiln':'tube')+' &middot; '+geometryVal+' &middot; '+recipe.binding.replace('_',' ');
+    '<b>'+fmt(recipe.pc,0)+' g</b> PC &middot; <b>'+fmt(recipe.fe,1)+' g</b> Fe ('+fmt(recipe.feRatio,2)+'&times;) &middot; <b>'+fmt(recipe.caco3,2)+' g</b> CaCO\u2083 ('+fmt(recipe.caRatio,2)+'&times;) &middot; <b>'+fmt(recipe.T,0)+' \u00b0C</b> &middot; <b>'+fmt(recipe.timeH,2)+' h</b> &middot; '+(isKiln?'kiln':'tube')+' &middot; '+geometryVal;
 
   const mb = runMassBalance(recipe, params, hyp.h1, hyp.h2, hyp.h3);
   const f = mb.fracs;
+  const graphiteYield = mb.feedC>0 ? mb.graphiteMass/mb.feedC : 0;  // g graphite / g feed C (absolute)
 
-  // stat tiles
+  // stat tiles: fraction (quality) AND absolute graphite yield (amount) side by side
   document.getElementById('stat-tiles').innerHTML =
     statTile('Ordering Q', fmt(mb.orderingQ*100,0)+'%', 'graphitic-lattice coordinate', true) +
-    statTile('Graphitic mass', fmt(f.graphitic*100,0)+'%', 'of surviving carbon') +
-    statTile('Carbon yield', fmt(mb.carbonYield*100,0)+'%', (params.o2_frac>0?'incl. O\u2082 burn':'vs. feed carbon')) +
-    statTile('Cross-section', fmt(mb.charDim,1)+' mm', '\u03c4 = '+fmt(mb.tau,1)+' min ('+geometryVal+')') +
-    statTile('Peak material T', fmt(mb.peakMatT,0)+' \u00b0C', 'gas peak '+fmt(recipe.T,0)+' \u00b0C');
+    statTile('Graphitic fraction', fmt(f.graphitic*100,0)+'%', 'of surviving carbon (quality)') +
+    statTile('Graphite yield', fmt(graphiteYield*100,0)+'%', 'graphite g / feed-C g (amount)', true) +
+    statTile('Carbon yield', fmt(mb.carbonYield*100,0)+'%', (params.o2_frac>0?'after O\u2082 burn':'vs. feed carbon')) +
+    statTile('Peak material T', fmt(mb.peakMatT,0)+' \u00b0C', 'gas peak '+fmt(recipe.T,0)+' \u00b0C, \u03c4 '+fmt(mb.tau,1)+' min');
 
   // temperature program chart: gas vs material temperature
   const traj = mb.trajectory;
@@ -1256,7 +1263,7 @@ function initSimControls(){
   wireSegmented('seg-binding', function(v){ bindingVal = v; });
   wireSegmented('seg-geometry', function(v){ geometryVal = v; });
   document.getElementById('btn-reset').addEventListener('click', function(){
-    els.fe.value=4; els.caco3.value=0.5; els.temp.value=1000; els.time.value=3;
+    els.fe.value=2; els.caco3.value=0.25; els.temp.value=1000; els.time.value=3;
     els.mass.value=2; els.o2.value=0;
     els.h1.checked=true; els.h2.checked=true; els.h3.checked=true;
     reactorVal='tube'; bindingVal='pellet'; geometryVal='puck';
