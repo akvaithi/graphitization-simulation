@@ -498,7 +498,7 @@
       <div class="card">
         <div class="card-title">Process &amp; Fe catalysis</div>
         <ul class="src-list">
-          <li>Banavath et&nbsp;al., <i>npj Materials Sustainability</i> <b>4</b>:23 (2026) &mdash; the ≤1600&nbsp;&deg;C Fe-catalyzed route; Fe plateau ~50&nbsp;wt%.</li>
+          <li>Banavath et&nbsp;al., <i>npj Materials Sustainability</i> <b>4</b>:23 (2026) &mdash; the &le;1600&nbsp;&deg;C Fe-catalyzed route; Fe plateau ~50&nbsp;wt%.</li>
           <li>AIChE 2025 (paper 693e) &mdash; the fuel-grade (high-sulfur) extension.</li>
           <li>Fe-catalyzed graphitization of isotropic carbon, <i>Carbon</i> (1983) &mdash; dissolution&ndash;reprecipitation via Fe carbide.</li>
         </ul>
@@ -973,10 +973,10 @@ function drawScatterChart(container, cfg){
    SECTION 1 -- REAL DATA SMALL MULTIPLES
 ====================================================================== */
 const FACTORS = [
-  {key:'temperature_C', label:'Temperature (°C)', fmt:function(v){return fmt(v,0);}},
+  {key:'temperature_C', label:'Temperature (\u00b0C)', fmt:function(v){return fmt(v,0);}},
   {key:'time_h', label:'Time (h)', fmt:function(v){return fmt(v,1);}},
   {key:'fe_ratio', label:'Fe (g)', fmt:function(v){return fmt(v,0);}},
-  {key:'caco3_ratio', label:'CaCO₃ (g)', fmt:function(v){return fmt(v,2);}},
+  {key:'caco3_ratio', label:'CaCO\u2083 (g)', fmt:function(v){return fmt(v,2);}},
 ];
 function buildGroundTruthCharts(){
   const wrap = document.getElementById('gt-charts');
@@ -998,9 +998,9 @@ function buildGroundTruthCharts(){
       yTicks:[0,50,100],
       series:[
         {name:'DG% (position)', x:xs, y:dg, color:cssVar('--ember'), r:3.4,
-         label:function(i){ return rows[i].display_name.replace(/·/g,'&middot;')+'<br>DG '+fmt(dg[i],1)+'%'; }},
-        {name:'Crystalline index ×100', x:xs, y:cf, color:cssVar('--steel'), r:3.4,
-         label:function(i){ return rows[i].display_name.replace(/·/g,'&middot;')+'<br>Index '+fmt(cf[i]/100,3); }},
+         label:function(i){ return rows[i].display_name.replace(/\u00b7/g,'&middot;')+'<br>DG '+fmt(dg[i],1)+'%'; }},
+        {name:'Crystalline index \u00d7100', x:xs, y:cf, color:cssVar('--steel'), r:3.4,
+         label:function(i){ return rows[i].display_name.replace(/\u00b7/g,'&middot;')+'<br>Index '+fmt(cf[i]/100,3); }},
       ],
     });
   });
@@ -1009,10 +1009,10 @@ function buildGroundTruthCharts(){
   const hiDG = rows.filter(function(r){ return r.DG_percent>=90; });
   const idxVals = hiDG.map(function(r){ return r.crystalline_fraction*100; });
   const lo = Math.min.apply(null,idxVals), hi = Math.max.apply(null,idxVals);
-  document.getElementById('gt-callout-num').textContent = fmt(lo,0)+'–'+fmt(hi,0)+'%';
+  document.getElementById('gt-callout-num').textContent = fmt(lo,0)+'\u2013'+fmt(hi,0)+'%';
   document.getElementById('gt-callout-text').innerHTML =
-    'Across the <b>'+hiDG.length+' scans reading DG% ≥ 90%</b>, the amorphous-aware crystallinity ' +
-    'index still spans <b>'+fmt(lo,0)+'% to '+fmt(hi,0)+'%</b>. Peak position alone cannot tell these runs apart — ' +
+    'Across the <b>'+hiDG.length+' scans reading DG% \u2265 90%</b>, the amorphous-aware crystallinity ' +
+    'index still spans <b>'+fmt(lo,0)+'% to '+fmt(hi,0)+'%</b>. Peak position alone cannot tell these runs apart \u2014 ' +
     'exactly the blind spot Section 2 tries to explain mechanistically.';
 }
 
@@ -1064,10 +1064,10 @@ function renderAll(){
   document.getElementById('lab-time').textContent = isKiln ? 'Residence time' : 'Hold time';
   document.getElementById('kiln-note').classList.toggle('show', isKiln);
   document.getElementById('prog-sub').innerHTML = isKiln
-    ? 'Rotary kiln: ramp to peak &rarr; immediate cool. <b>No isothermal hold</b> — the scale-up challenge.'
+    ? 'Rotary kiln: ramp to peak &rarr; immediate cool. <b>No isothermal hold</b> \u2014 the scale-up challenge.'
     : 'Tube furnace: preheat holds &rarr; process hold &rarr; programmed + natural cooling.';
   document.getElementById('recipe-readout').innerHTML =
-    '<b>'+fmt(recipe.pc,0)+' g</b> PC &middot; <b>'+fmt(recipe.fe,1)+' g</b> Fe &middot; <b>'+fmt(recipe.caco3,2)+' g</b> CaCO₃ &middot; <b>'+fmt(recipe.T,0)+' °C</b> &middot; <b>'+fmt(recipe.timeH,2)+' h</b> &middot; '+(isKiln?'kiln':'tube')+' &middot; '+recipe.binding.replace('_',' ');
+    '<b>'+fmt(recipe.pc,0)+' g</b> PC &middot; <b>'+fmt(recipe.fe,1)+' g</b> Fe &middot; <b>'+fmt(recipe.caco3,2)+' g</b> CaCO\u2083 &middot; <b>'+fmt(recipe.T,0)+' \u00b0C</b> &middot; <b>'+fmt(recipe.timeH,2)+' h</b> &middot; '+(isKiln?'kiln':'tube')+' &middot; '+recipe.binding.replace('_',' ');
 
   const mb = runMassBalance(recipe, params, hyp.h1, hyp.h2, hyp.h3);
   const f = mb.fracs;
@@ -1076,8 +1076,8 @@ function renderAll(){
   document.getElementById('stat-tiles').innerHTML =
     statTile('Ordering Q', fmt(mb.orderingQ*100,0)+'%', 'graphitic-lattice coordinate', true) +
     statTile('Graphitic mass', fmt(f.graphitic*100,0)+'%', 'of surviving carbon') +
-    statTile('Carbon yield', fmt(mb.carbonYield*100,0)+'%', (params.o2_frac>0?'incl. O₂ burn':'vs. feed carbon')) +
-    statTile('Fe contact', fmt(mb.contact,2)+'×', recipe.binding.replace('_',' ')+', '+fmt(recipe.pc,0)+' g') +
+    statTile('Carbon yield', fmt(mb.carbonYield*100,0)+'%', (params.o2_frac>0?'incl. O\u2082 burn':'vs. feed carbon')) +
+    statTile('Fe contact', fmt(mb.contact,2)+'\u00d7', recipe.binding.replace('_',' ')+', '+fmt(recipe.pc,0)+' g') +
     statTile('Post-acid', fmt(mb.postAcid,3)+' g', 'washed product');
 
   // temperature program chart
@@ -1085,8 +1085,8 @@ function renderAll(){
   const tHrsP = traj.times.map(function(t){ return t/60; });
   drawLineChart(document.getElementById('chart-program'), {
     w:500, h:200, xDomain:[0, tHrsP[tHrsP.length-1]||1], yDomain:[0,1500],
-    yTicks:[0,500,1000,1500], xFmt:function(v){return fmt(v,1)+'h';}, yFmt:function(v){return fmt(v,0)+'°';},
-    tipTitle:function(v){ return 't = '+fmt(v,2)+' h'; }, tipFmt:function(v){return fmt(v,0)+' °C';},
+    yTicks:[0,500,1000,1500], xFmt:function(v){return fmt(v,1)+'h';}, yFmt:function(v){return fmt(v,0)+'\u00b0';},
+    tipTitle:function(v){ return 't = '+fmt(v,2)+' h'; }, tipFmt:function(v){return fmt(v,0)+' \u00b0C';},
     series:[{name:'Temperature', x:tHrsP, y:traj.temps, color:cssVar('--ochre'), area:true}],
   });
 
@@ -1112,8 +1112,8 @@ function renderAll(){
   const yMax = Math.max.apply(null, xrd.ys)*1.12;
   drawLineChart(document.getElementById('chart-xrd'), {
     w:500, h:210, xDomain:[20,32], yDomain:[0,yMax],
-    yTicks:evenTicks(0,yMax,3), xFmt:function(v){return fmt(v,0)+'°';}, yFmt:function(v){return fmt(v,0);},
-    tipTitle:function(v){ return '2θ = '+fmt(v,2)+'°'; }, tipFmt:function(v){return fmt(v,1);},
+    yTicks:evenTicks(0,yMax,3), xFmt:function(v){return fmt(v,0)+'\u00b0';}, yFmt:function(v){return fmt(v,0);},
+    tipTitle:function(v){ return '2\u03b8 = '+fmt(v,2)+'\u00b0'; }, tipFmt:function(v){return fmt(v,1);},
     series:[{name:'Intensity', x:xrd.xs, y:xrd.ys, color:cssVar('--ember'), area:true}],
   });
 
@@ -1127,8 +1127,8 @@ function renderAll(){
   drawLineChart(document.getElementById('chart-tga'), {
     w:500, h:210, xDomain:[200,900], yDomain:[0, Math.max(0.002, Math.max.apply(null,dtg.dtg)*1.15)],
     yTicks:evenTicks(0, Math.max(0.002, Math.max.apply(null,dtg.dtg)*1.15), 3),
-    xFmt:function(v){return fmt(v,0)+'°';}, yFmt:function(v){return fmt(v*1000,1);},
-    tipTitle:function(v){ return fmt(v,0)+' °C'; }, tipFmt:function(v){return fmt(v*1000,2)+' ×10⁻³/min';},
+    xFmt:function(v){return fmt(v,0)+'\u00b0';}, yFmt:function(v){return fmt(v*1000,1);},
+    tipTitle:function(v){ return fmt(v,0)+' \u00b0C'; }, tipFmt:function(v){return fmt(v*1000,2)+' \u00d710\u207b\u00b3/min';},
     series:[{name:'DTG (mass loss rate)', x:dtg.TC, y:dtg.dtg, color:cssVar('--ember'), area:true}],
   });
 
@@ -1140,7 +1140,7 @@ function renderAll(){
     {label:'Post-acid (product)', val:mb.postAcid},
   ];
   const maxV = mb.pellet;
-  const burnRow = params.o2_frac>0 ? '<div style="font-size:11.5px;color:var(--critical);margin-top:2px;">Carbon burned by O₂: <span class="mono">'+fmt(mb.burnedC,3)+' g</span></div>' : '';
+  const burnRow = params.o2_frac>0 ? '<div style="font-size:11.5px;color:var(--critical);margin-top:2px;">Carbon burned by O\u2082: <span class="mono">'+fmt(mb.burnedC,3)+' g</span></div>' : '';
   ledgerEl.innerHTML = stages.map(function(s){
     const pct = Math.max(2, s.val/maxV*100);
     return '<div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-soft);margin-bottom:4px;"><span>'+s.label+'</span><span class="mono">'+fmt(s.val,3)+' g</span></div>'+
@@ -1184,7 +1184,7 @@ function renderH2Panel(recipe, params){
   drawLineChart(document.getElementById('chart-h2'), {
     w:500, h:210, xDomain:[0,1.25], yDomain:[Math.max(0,yLo),102],
     xTicks:[0,0.4,0.8,1.2], xFmt:function(v){return fmt(v,1);}, yFmt:function(v){return fmt(v,0)+'%';},
-    tipTitle:function(v){ return fmt(v,2)+' g CaCO₃'; }, tipFmt:function(v){return fmt(v,1)+'%';},
+    tipTitle:function(v){ return fmt(v,2)+' g CaCO\u2083'; }, tipFmt:function(v){return fmt(v,1)+'%';},
     series:[
       {name:'H2 off', x:caRange, y:off, color:cssVar('--steel')},
       {name:'H2 on (etching)', x:caRange, y:on, color:cssVar('--ember')},
@@ -1201,10 +1201,10 @@ function renderScaleupCallout(recipe, params, hyp, mb){
   const gTube = runMassBalance(tubeRc, params, hyp.h1,hyp.h2,hyp.h3).fracs.graphitic;
   const gKiln = runMassBalance(kilnRc, params, hyp.h1,hyp.h2,hyp.h3).fracs.graphitic;
   const kilnWet = runMassBalance(Object.assign({},kilnRc,{binding:'wet_impregnation'}), params, hyp.h1,hyp.h2,hyp.h3).fracs.graphitic;
-  document.getElementById('scaleup-num').textContent = fmt(gTube*100,0)+'% → '+fmt(gKiln*100,0)+'%';
+  document.getElementById('scaleup-num').textContent = fmt(gTube*100,0)+'% \u2192 '+fmt(gKiln*100,0)+'%';
   document.getElementById('scaleup-text').innerHTML =
-    'Same recipe, <b>tube furnace vs. rotary kiln</b>: graphitic mass drops from <b>'+fmt(gTube*100,0)+'%</b> to <b>'+fmt(gKiln*100,0)+'%</b> — the kiln has no isothermal hold, so far less time at temperature. '+
-    'Switching the kiln charge to <b>wet impregnation</b> recovers it to <b>'+fmt(kilnWet*100,0)+'%</b> (finer Fe–carbon contact). Try the reactor and binding controls to explore the scale-up window.';
+    'Same recipe, <b>tube furnace vs. rotary kiln</b>: graphitic mass drops from <b>'+fmt(gTube*100,0)+'%</b> to <b>'+fmt(gKiln*100,0)+'%</b> \u2014 the kiln has no isothermal hold, so far less time at temperature. '+
+    'Switching the kiln charge to <b>wet impregnation</b> recovers it to <b>'+fmt(kilnWet*100,0)+'%</b> (finer Fe\u2013carbon contact). Try the reactor and binding controls to explore the scale-up window.';
 }
 
 function wireSegmented(groupId, onPick){
@@ -1258,7 +1258,7 @@ function buildCalibration(){
   const mae = errs.reduce(function(a,b){return a+b;},0)/errs.length;
   document.getElementById('cal-stats').innerHTML =
     statTile('Held-out MAE', fmt(mae,2)+' wt%', 'target < 5 wt%', true) +
-    statTile('Fit R²', fmt(CAL.r2,3), 'degree-'+CAL.degree+' polynomial');
+    statTile('Fit R\u00b2', fmt(CAL.r2,3), 'degree-'+CAL.degree+' polynomial');
 }
 
 /* ======================================================================
