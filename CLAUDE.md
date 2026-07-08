@@ -53,14 +53,24 @@ Two reactor modes, both full multi-segment programs (piecewise-linear T(t)):
   (`time_h`) → **programmed cooling** (5 °C/min to 500 °C) → **natural cooling**.
   The 1400 °C / 2 h example is reproduced exactly. The preheat holds matter:
   calcination and sulfur trapping begin during the 800 °C hold, not only at peak.
-- **Rotary kiln** (`reactor="kiln"`) — the scale-up reactor. **No isothermal
-  hold**: a triangular RT → peak → RT profile over the residence time (true
-  residence time, not time-on-stream). Hard limits enforced in the dashboard:
-  peak ≤ 1300 °C, residence ≤ 2 h. Because there is no hold, the same peak
-  graphitizes far less than in the tube furnace — the central scale-up finding.
-- **Still simplified:** single linear ramp *rate* between segments (not the exact
-  controller curve); no intra-pellet thermal gradient; the kiln triangle is a
-  modeling assumption (Sunkara 2009) — heat_frac is adjustable in `schedule.py`.
+- **Rotary kiln** (`reactor="kiln"`) — the scale-up reactor. **It DOES have an
+  isothermal hold**: fast heated entry → isothermal hold at peak (the hot-zone
+  traverse, the bulk of the residence) → fast cool exit (Kintek kiln-zone refs).
+  Hard limits: peak ≤ 1300 °C, residence ≤ 2 h. With the hold, a 1300 °C/2 h kiln
+  pass graphitizes well (~90% at lab cross-section) — the kiln is viable; the
+  scale penalty comes from cross-section, not the reactor. *(An earlier version
+  wrongly modeled the kiln as a hold-free triangle; corrected per lab feedback.)*
+
+### Material thermal lag (`sim/kinetics.py`, the heat-transfer model)
+The **gas** follows the program above; the **material** lags it by a lumped-
+capacitance time constant and the chemistry sees the *material* temperature:
+`dT_mat/dt = (T_gas − T_mat)/τ`, `τ = tau_lin·L + tau_quad·L²`, L = cross-sectional
+dimension (mm). Carbon's finite conductivity (raw coke ~2–4 W/m·K) means a thin
+lab puck (L≈2.5 mm, τ≈0.6 min) tracks the gas, but a thick cross-section lags and
+never reaches peak. This is the real scale-up lever — and why the **extruder**
+(fixed small cross-section, length scales with throughput) carries no thermal
+penalty while a **bigger puck** (L grows as mass^⅓) does. `Recipe.geometry`
+("puck"/"extrudate") + `pc_mass` set L via `char_dim_mm()`, or override directly.
 
 ### Atmosphere (argon by default; optional O₂ for scale-up)
 - The lab furnace runs under argon → default `o2_frac = 0`, i.e. **no combustion**:
@@ -77,17 +87,26 @@ Two reactor modes, both full multi-segment programs (piecewise-linear T(t)):
   escapes at `k_esc`), so Boudouard *efficiency* is emergent. Argon flow is
   subsumed into `k_esc`.
 
-### Scale-up model (`sim/kinetics.py: contact_factor`, `BINDING_CONTACT`)
-The catalytic step is a dissolution–reprecipitation at the Fe–carbon interface, so
-**how the charge is prepared sets a direct rate multiplier** (`contact`):
-- `binding` ∈ {`pellet` 1.0 (pressed baseline), `wet_impregnation` 1.6 (finest Fe
-  dispersion), `extrusion` 0.9 (shaped, low pressure), `dry_mix` 0.45 (loose
-  powder, pressureless)} — values are **hypothesis-level** (no scale-up data),
-  adjustable, and sourced in SOURCES.md §6.
-- `pc_mass > 2 g` applies a heat/mass-transfer penalty (`contact_mass_k`) — bigger
-  charges graphitize less (Banavath saw it for bigger pellets).
-- These do not touch the tube-furnace fit (defaults: `pellet`, 2 g, `o2_frac=0` →
-  `contact=1`), so the fit stays clean while scale-up stays exploratory.
+### Scale-up model — two independent levers
+1. **Fe–carbon contact** (`contact_factor`, `BINDING_CONTACT`): the catalytic step
+   is a dissolution–reprecipitation at the Fe–carbon interface, so binding sets a
+   rate multiplier — `pellet` 1.0, `wet_impregnation` 1.6 (finest dispersion),
+   `extrusion` 0.9, `dry_mix` 0.45. Throughput/charge mass does **not** enter here.
+2. **Heat transfer** (thermal lag above): size enters only through the
+   cross-section, so scaling by extrusion (constant cross-section) has no penalty.
+- Both are **hypothesis-level** (no scale-up data), adjustable, sourced in
+  SOURCES.md §5–6, and leave the tube-furnace fit untouched (lab defaults give
+  contact=1, τ≈0.6 min).
+
+### Hypotheses: H1 confirmed, H3 the focus, H2 negligible
+- **H1** (sulfur trapping) confirmed — see above.
+- **H3** (calcium) is the discrimination **focus**: calcium reduces Fe particle
+  size / prevents sintering, wets the Fe (CaO–FeₓOy layer), and co-catalyzes via a
+  CaC₂ carbide route above ~1200 °C — together lowering the graphitization onset
+  (the group's ~350 °C shift). Modeled as a saturating rate multiplier `disp` in
+  the CaO fraction. Sources in SOURCES.md §2b.
+- **H2** (Boudouard) has **negligible** impact (toggling it barely moves results;
+  `alpha_H2` rails in the fit) — de-emphasized in the dashboard, kept as a toggle.
 
 ### Feedstock composition — GPC, sulfur stoichiometry
 - All runs use **Green Petroleum Coke (GPC)**, measured **~7 wt% S** (very high —

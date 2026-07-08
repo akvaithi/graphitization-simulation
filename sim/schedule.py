@@ -10,19 +10,18 @@ Two reactor modes, matching the two pieces of equipment in this project:
   onset ~700-850 C) and sulfur trapping begin during the 800 C hold, not only at
   the peak.
 
-- ``rotary_kiln_program`` — the scale-up reactor. Continuous rotary kiln with a
-  hard limit of ~1300 C and ~2 h, and crucially **no isothermal hold**: material
-  enters at room temperature, is carried up to the peak, and is cooled essentially
-  immediately (true residence time, not time-on-stream). Modeled as a triangular
-  ramp-up / ramp-down over the residence time. Because there is no long hold, the
-  integrated time-at-temperature is far smaller than the tube furnace's — the
-  central scale-up challenge this simulation is meant to expose.
-
-Rotary-kiln residence times for carbon/coke are short — commonly ~10-45 min, up
-to ~30 min typical (Sunkara et al., *Powder Technol.* 2009; petroleum-coke
-calcining practice) — which is why the 2 h kiln limit is generous but the missing
-hold still bites. Calcined-coke practice runs 1150-1350 C in an oxygen-deficient
-(not fully inert) atmosphere (industry calcining references) — see SOURCES.md.
+- ``rotary_kiln_program`` — the scale-up reactor. A continuous rotary kiln
+  DOES create an isothermal hold: material is carried through a heated entry
+  zone, held at peak while it traverses the hot zone, then cooled through an exit
+  zone (Kintek kiln-zone refs; SOURCES.md sec.5). Modeled as fast entry ramp ->
+  isothermal hold (the bulk of the residence time) -> fast exit cool, with hard
+  limits of ~1300 C and ~2 h. How fast the *material itself* heats and cools
+  within this gas profile is a separate question answered by its thermal time
+  constant (sim.kinetics): carbon's finite conductivity (raw coke k ~ 2-4 W/m.K)
+  means a thin cross-section tracks the gas in under a minute while a thick one
+  lags — which is why the extruder scale-up route (fixed small cross-section)
+  matters. Earlier versions modeled the kiln as a hold-free triangle; that was
+  wrong (there IS a hold), corrected per lab feedback.
 """
 from __future__ import annotations
 
@@ -102,19 +101,26 @@ def tube_furnace_program(peak_C: float, hold_h: float, *,
 
 
 def rotary_kiln_program(peak_C: float, residence_h: float, *,
-                        heat_frac: float = 0.5,
+                        entry_min: float = 12.0, exit_min: float = 12.0,
                         T0_C: float = T_ROOM_C) -> TemperatureProgram:
-    """Continuous rotary kiln: RT -> peak -> RT over the residence time, with NO
-    isothermal hold ("true residence time", not time-on-stream). Triangular
-    profile; ``heat_frac`` is the fraction of residence spent heating (0.5 =
-    symmetric). This is the scale-up reactor — its missing hold is why the same
-    peak temperature graphitizes far less than in the tube furnace.
+    """Continuous rotary kiln gas/wall profile: a short heated **entry** ramp ->
+    an **isothermal hold** at peak (the hot-zone traverse) -> a short **exit**
+    cool. The material is carried through the kiln's temperature zones, so it
+    reaches peak, is held for most of the residence time, then cooled (the hold
+    exists; Kintek kiln-zone refs, SOURCES.md sec.5). How fast the *material*
+    itself heats/cools within this gas profile is set separately by its thermal
+    time constant (sim.kinetics thermal lag): carbon's finite conductivity means
+    a thick cross-section lags the gas while a thin one tracks it closely.
+
+    ``entry_min`` / ``exit_min`` are the heated/cooled zone traverse times; the
+    isothermal hold fills the rest of the residence time.
     """
     residence_min = residence_h * 60.0
-    up = max(heat_frac, 0.05) * residence_min
-    down = residence_min - up
+    hold = max(0.0, residence_min - entry_min - exit_min)
     return _segments_to_program(0.0, T0_C,
-                                [(up, peak_C), (down, T0_C)],
+                                [(min(entry_min, residence_min), peak_C),
+                                 (hold, peak_C),
+                                 (exit_min if hold > 0 else 0.0, T0_C)],
                                 f"kiln: peak {peak_C:.0f}C, residence {residence_h:.2g}h")
 
 

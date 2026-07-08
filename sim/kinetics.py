@@ -38,29 +38,56 @@ R_GAS = 8.314  # J/mol/K
 M_O2 = 31.998
 M_O = M_CaO + M_S - M_CaS  # 15.999 per mol trapped: the O2 leaving in H1
 
-# --- scale-up: Fe-carbon interfacial contact by binding method ----------------
+# --- scale-up part 1: Fe-carbon interfacial contact by binding method ---------
 # Multiplies the graphitization rate. The catalytic step is a dissolution-
-# reprecipitation at the Fe-carbon interface (Banavath 2026; Oya & Marsh 1982), so
-# the intimacy of Fe-carbon contact set by how the charge is prepared is a direct
-# rate lever. Values are hypothesis-level (no scale-up data yet) and adjustable:
+# reprecipitation at the Fe-carbon interface (Banavath 2026; Oya carbide route
+# 1983), so how intimately Fe touches the carbon is a direct rate lever. Values
+# are hypothesis-level (no scale-up data yet) and adjustable:
 #   pellet           7-ton pressed, intimate contact -- the published baseline.
 #   wet_impregnation Fe deposited from solution -> finest, most homogeneous
-#                    dispersion (Frankenstein 2023; Gomez-Martin biochar 2021).
+#                    dispersion (Frankenstein 2023; biochar Fe-impregnation 2021).
 #   extrusion        shaped with mixing but far lower pressure than pelletizing
 #                    (FEECO; Zhang solvent-free anode 2022).
 #   dry_mix          loose powder, pressureless -- poorest contact.
 BINDING_CONTACT = {"pellet": 1.0, "wet_impregnation": 1.6, "extrusion": 0.9, "dry_mix": 0.45}
-_REF_MASS_G = 2.0  # charge mass the model is anchored to (all current data is 2 g PC)
 
 
 def contact_factor(recipe: Recipe, p: "Params") -> float:
-    """Effective Fe-carbon contact multiplier for the graphitization rate: the
-    binding-method factor, penalized for larger charges (bigger pellets need
-    longer dwell -- Banavath 2026 saw 1.2->7 g lower DG 97.7->94.1%)."""
-    base = BINDING_CONTACT.get(recipe.binding, 1.0)
-    over = max(0.0, (recipe.pc_mass - _REF_MASS_G) / _REF_MASS_G)
-    mass_penalty = 1.0 / (1.0 + p.contact_mass_k * over)
-    return base * mass_penalty
+    """Fe-carbon contact multiplier from the binding method (throughput/charge
+    mass is NOT penalized here -- size enters through the thermal lag below,
+    because scaling up via extrusion keeps the cross-section, and thus heat
+    transfer, unchanged)."""
+    return BINDING_CONTACT.get(recipe.binding, 1.0)
+
+
+# --- scale-up part 2: heat transfer set by the cross-sectional dimension -------
+# Carbon's thermal conductivity is finite (raw coke ~2-4 W/m.K, rising with
+# graphitization; Springer pet-coke thermo-physical 2016), so a formed body heats
+# and cools on a thermal time constant set by its *cross-section*, not its total
+# mass. A lumped-capacitance material temperature lags the gas:
+#     dT_mat/dt = (T_gas - T_mat) / tau,   tau = tau_lin*L + tau_quad*L^2  (L in mm)
+# The linear term is surface convection (rho*cp*(V/A)/h) and the quadratic term is
+# internal conduction (L^2/alpha); both grow with the cross-section. This is why a
+# thin lab puck (L~2.5 mm, tau < 1 min) tracks the furnace but a thick bed lags,
+# and why an EXTRUDER -- constant small cross-section, length scales with
+# throughput -- carries no thermal penalty at scale. (SOURCES.md sec.5-6.)
+_LAB_PUCK_CHAR_MM = 2.5   # V/A of the pressed ~13 mm-die 2 g-PC lab pellet
+_REF_MASS_G = 2.0
+
+
+def char_dim_mm(recipe: Recipe) -> float:
+    """Characteristic cross-sectional dimension (mm) that sets the thermal lag."""
+    if recipe.char_dim_mm is not None:
+        return float(recipe.char_dim_mm)
+    if recipe.geometry == "extrudate":
+        return _LAB_PUCK_CHAR_MM        # fixed die cross-section; length scales instead
+    # puck: cross-section grows isometrically with the charge (L ~ mass^(1/3))
+    return _LAB_PUCK_CHAR_MM * (max(recipe.pc_mass, 1e-6) / _REF_MASS_G) ** (1.0 / 3.0)
+
+
+def thermal_tau_min(L_mm: float, p: "Params") -> float:
+    """Lumped-capacitance thermal time constant (min) for cross-section L (mm)."""
+    return p.tau_lin * L_mm + p.tau_quad * L_mm * L_mm
 
 
 @dataclass
@@ -104,8 +131,10 @@ class Params:
     k0_o2: float = 1.5e5
     Ea_o2: float = 165e3
     o2_alpha: float = 6.0        # amorphous/graphitic O2-burn selectivity
-    # scale-up: charge-mass penalty on Fe-carbon contact (see contact_factor)
-    contact_mass_k: float = 0.06
+    # scale-up thermal lag: tau(min) = tau_lin*L + tau_quad*L^2, L = cross-section (mm)
+    # (surface convection + internal conduction; SOURCES.md sec.5-6)
+    tau_lin: float = 0.22
+    tau_quad: float = 0.010
     # furnace schedule (see sim.schedule; ramp/preheats live there)
     T0_C: float = schedule.T_ROOM_C
     # acid wash removal efficiencies
@@ -125,9 +154,14 @@ def _arrh(k0: float, Ea: float, T_K: float) -> float:
 
 
 def rhs(t: float, y: np.ndarray, program: "schedule.TemperatureProgram",
-        p: Params, contact: float = 1.0) -> np.ndarray:
-    T = program.T_K_at(t)
+        p: Params, contact: float = 1.0, tau: float = 0.01) -> np.ndarray:
     d = np.zeros_like(y)
+    # material temperature lags the gas by the lumped-capacitance time constant;
+    # the chemistry sees the MATERIAL temperature, not the gas program directly.
+    T_gas_C = program.T_C_at(t)
+    T_mat_C = y[IDX["T_mat"]]
+    d[IDX["T_mat"]] = (T_gas_C - T_mat_C) / max(tau, 1e-6)
+    T = T_mat_C + 273.15
     g = lambda name: max(y[IDX[name]], 0.0)  # noqa: E731
 
     C_am, C_turb, C_gr = g("C_am"), g("C_turb"), g("C_gr")
@@ -166,6 +200,14 @@ def rhs(t: float, y: np.ndarray, program: "schedule.TemperatureProgram",
     # --- graphitization (dissolution-reprecipitation at the Fe interface) ----
     fe_frac = g("Fe") / solids if solids > 0 else 0.0
     f_fe = fe_frac / (p.K_fe + fe_frac) if fe_frac > 0 else 0.0
+    # H3: calcium boosts the graphitization rate. Calcium (a) reduces Fe particle
+    # size and prevents sintering (CaO confinement effect), (b) WETS the Fe surface
+    # forming a CaO-FexOy layer that spreads the catalyst, and (c) is itself a
+    # graphitization catalyst via a CaC2 carbide route above ~1200 C -- together a
+    # dispersion + co-catalysis enhancement (Nature Sci.Rep. 2023/2022; TOF-SIMS
+    # wetting 2022; SOURCES.md sec.H3). Saturating in the CaO fraction (an optimum
+    # loading exists; excess Ca over-graphitizes). This is the load-bearing CaCO3
+    # effect; H2 (Boudouard) is negligible in the fit.
     disp = 1.0
     if p.H3 and solids > 0:
         u = g("CaO") / solids
@@ -219,10 +261,12 @@ def simulate(recipe: Recipe, p: Params, c_wt: float, s_wt: float,
     re-integrating."""
     prog = schedule.program_for(recipe.reactor, recipe.temperature_C, recipe.time_h)
     contact = contact_factor(recipe, p)
+    L = char_dim_mm(recipe)
+    tau = thermal_tau_min(L, p)
     y0 = initial_state(recipe, c_wt, s_wt)
     t_end = prog.total_min
     t_eval = np.linspace(0.0, t_end, n_eval)
-    sol = solve_ivp(rhs, (0.0, t_end), y0, args=(prog, p, contact), method="LSODA",
+    sol = solve_ivp(rhs, (0.0, t_end), y0, args=(prog, p, contact, tau), method="LSODA",
                     t_eval=t_eval, rtol=1e-8, atol=1e-10, max_step=5.0)
     if not sol.success:
         raise RuntimeError(f"ODE integration failed: {sol.message}")
@@ -230,9 +274,10 @@ def simulate(recipe: Recipe, p: Params, c_wt: float, s_wt: float,
     yf[IDX["Q"]] = min(sol.y[IDX["Q"], -1], 1.0)
     return {
         "recipe": recipe, "params": p, "c_wt": c_wt, "s_wt": s_wt,
-        "program": prog, "contact": contact,
+        "program": prog, "contact": contact, "char_dim_mm": L, "thermal_tau_min": tau,
         "t_min": sol.t, "traj": sol.y, "y0": y0, "y_final": yf,
-        "T_K": np.array([prog.T_K_at(t) for t in sol.t]),
+        "T_gas_C": np.array([prog.T_C_at(t) for t in sol.t]),
+        "T_mat_C": sol.y[IDX["T_mat"]],
     }
 
 

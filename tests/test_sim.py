@@ -114,14 +114,27 @@ def test_binding_contact_ordering():
     assert c_wet > c_pel > c_dry
 
 
-def test_larger_charge_lowers_contact():
-    """Bigger charges have worse heat/mass transfer (Banavath: bigger pellets
-    lowered DG) -- the contact factor should fall with charge mass."""
-    from sim.kinetics import contact_factor, Params
+def test_thermal_lag_grows_with_cross_section_not_throughput():
+    """Heat transfer is set by the cross-sectional dimension, not total mass: a
+    bigger puck lags more, but an extrudate scaled to the same mass keeps its
+    (small) cross-section and its (short) thermal time constant -- the extruder
+    scale-up route. (Springer pet-coke thermo-physical; SOURCES.md.)"""
+    from sim.kinetics import Params, char_dim_mm, thermal_tau_min
     p = Params()
-    small = contact_factor(Recipe(2, 4, 0.5, 1200, 5), p)
-    big = contact_factor(Recipe(50, 4, 0.5, 1200, 5), p)
-    assert big < small
+    small = char_dim_mm(Recipe(2, 4, 0.5, 1200, 5, geometry="puck"))
+    big_puck = char_dim_mm(Recipe(200, 400, 50, 1200, 5, geometry="puck"))
+    extrudate = char_dim_mm(Recipe(200, 400, 50, 1200, 5, geometry="extrudate"))
+    assert big_puck > small                      # bigger puck -> bigger cross-section
+    assert extrudate == small                    # extrudate keeps the die cross-section
+    assert thermal_tau_min(big_puck, p) > thermal_tau_min(extrudate, p)
+
+
+def test_material_temperature_lags_gas_for_thick_pieces():
+    """A thick cross-section should reach a lower peak material temperature than
+    a thin one under the same fast kiln profile (finite conductivity)."""
+    thin = run_mass_balance(Recipe(2, 4, 0.5, 1300, 2, reactor="kiln", char_dim_mm=2.0))
+    thick = run_mass_balance(Recipe(2, 4, 0.5, 1300, 2, reactor="kiln", char_dim_mm=40.0))
+    assert thick["sim"]["T_mat_C"].max() < thin["sim"]["T_mat_C"].max()
 
 
 def test_o2_burns_carbon_and_conserves_mass():

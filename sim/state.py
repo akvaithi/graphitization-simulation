@@ -29,6 +29,7 @@ FIELDS = (
     "CaS",
     "Fe",        # catalyst (not consumed; solid throughout)
     "Q",         # ordering coordinate of the graphitic phase, 0..1 (NOT a mass)
+    "T_mat",     # material temperature (deg C) — lags the gas via lumped capacitance (NOT a mass)
     # -- transient --
     "CO2_pool",  # CO2 released by calcination, still inside the pellet
     # -- gas ledger (cumulative, left the pellet) --
@@ -42,7 +43,8 @@ FIELDS = (
                    # tracks carbon only (the O2 is external), so the ledger stays closed
 )
 IDX = {name: i for i, name in enumerate(FIELDS)}
-_MASS_FIELDS = tuple(f for f in FIELDS if f != "Q")
+_NON_MASS = {"Q", "T_mat"}
+_MASS_FIELDS = tuple(f for f in FIELDS if f not in _NON_MASS)
 
 
 @dataclass
@@ -68,6 +70,11 @@ class Recipe:
     grade: str = "GPC"
     reactor: str = "tube"
     binding: str = "pellet"
+    geometry: str = "puck"        # "puck" (cross-section grows with charge) or
+                                  # "extrudate" (fixed die cross-section, length scales)
+    char_dim_mm: float | None = None  # override the characteristic cross-sectional
+                                      # dimension (mm) that sets the thermal lag;
+                                      # None -> derived from geometry + pc_mass
 
     @property
     def pellet_mass(self) -> float:
@@ -84,6 +91,7 @@ def initial_state(recipe: Recipe, c_wt: float, s_wt: float) -> np.ndarray:
     y[IDX["VOL"]] = recipe.pc_mass * max(0.0, 1.0 - c_wt - s_wt)
     y[IDX["CaCO3"]] = recipe.caco3_mass
     y[IDX["Fe"]] = recipe.fe_mass
+    y[IDX["T_mat"]] = 25.0  # material starts at room temperature
     return y
 
 

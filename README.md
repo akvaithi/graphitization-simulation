@@ -77,26 +77,25 @@ Fuller detail in `CLAUDE.md`, and every claim is cited in `SOURCES.md`. The
 load-bearing points:
 
 - **The full furnace program is modeled** (`sim/schedule.py`). The tube furnace
-  reproduces the group's real multi-segment controller schedule — preheat holds
-  at 300/800/1200 °C, the process hold, then programmed + natural cooling (the
-  1400 °C / 2 h program is reproduced exactly). The **rotary kiln** (scale-up) is
-  a hold-free RT→peak→RT triangle over the residence time, with hard limits of
-  1300 °C and 2 h.
-- **Atmosphere is argon by default** (`o2_frac = 0`, no combustion) — carbon
-  leaves only as CO/CO₂ (Boudouard) or volatiles. An **O₂ slider** turns on a
-  combustion term to explore a non-inert / imperfectly-sealed atmosphere at scale.
-- **Scale-up levers** (predictive, no data yet): reactor (tube/kiln), sample
-  charge (>2 g), Fe–carbon binding (pellet / wet impregnation / extrusion / dry
-  mix), and O₂. The kiln's missing hold predicts a large graphitization penalty
-  that finer Fe contact (wet impregnation) and higher Fe partly recover.
+  reproduces the group's real multi-segment controller schedule (preheat holds at
+  300/800/1200 °C, process hold, programmed + natural cooling; the 1400 °C / 2 h
+  program is reproduced exactly). The **rotary kiln** is a fast-entry →
+  **isothermal hold** (hot-zone traverse) → fast-cool profile, hard-limited to
+  1300 °C and 2 h — the hold is real, so a 1300 °C/2 h kiln pass graphitizes well.
+- **Heat transfer** is modeled as a lumped-capacitance material temperature that
+  lags the gas by a time constant set by the piece's **cross-section** (raw coke
+  k ≈ 2–4 W/m·K): a thin puck tracks the furnace, a thick one lags. So scale-up
+  by **extrusion** (constant small cross-section, length scales with throughput)
+  carries no heat-transfer penalty, while a **bigger puck** does.
+- **Atmosphere is argon by default** (`o2_frac = 0`); an **O₂ slider** adds a
+  combustion term for a non-inert atmosphere at scale.
+- **Scale-up levers** (predictive, no data yet): reactor (tube/kiln), throughput,
+  form factor (puck/extrudate), Fe–carbon binding, and O₂.
 - **Feedstock is Green Petroleum Coke, ~7 wt% S** (`DEFAULT_COMPOSITION["GPC"]`
-  = 6.5 wt% S, chosen so 0.4063 g CaCO₃ is exactly the 1:1 sulfur match — the
-  experimental threshold anchor). The sulfur load sets the H1 threshold.
-- **H1 (sulfur trapping) is confirmed** — without CaCO₃ the high-sulfur coke does
-  not graphitize, and the sharp threshold sits at the 1:1 S:CaCO₃ point.
-  **H2 and H3 are not yet identified** from XRD-only data (fit parameters rail to
-  bounds). The **H2 test panel** in the dashboard folds in the measured carbon
-  yields: H2 would show a yield cost as CaCO₃ rises.
+  = 6.5 wt% S, so 0.4063 g CaCO₃ is exactly the 1:1 sulfur match — the threshold
+  anchor). **H1 (sulfur trapping) is confirmed** (no CaCO₃ → no graphitization).
+  **H3 (calcium dispersion + wetting + CaC₂ co-catalysis) is the focus** and
+  explains the ~350 °C onset shift; **H2 (Boudouard) is negligible**.
 - **DG% gets an internal-standard 2θ correction** (residual Fe/Fe₃C peaks) — a
   raw scan read an impossible 106.8%; corrected, 93.3%.
 
