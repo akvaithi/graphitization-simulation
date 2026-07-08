@@ -134,11 +134,12 @@ ledger.
 ## Confirmed vs. open science (as of this dataset)
 
 - **H1 (sulfur trapping) is confirmed.** Runs **without CaCO₃ do not graphitize** —
-  the 7 wt% sulfur in GPC poisons the Fe catalyst at these low temperatures, and
-  CaO from CaCO₃ is what neutralizes it. The **sharp threshold at the 1:1 S:CaCO₃
-  point** (the 0.2031 g run fails: DG −18.5%, crystallinity 0.25; the 0.4063 g
-  run works) is the stoichiometric fingerprint of a trapping sink. The fitted
-  `p_poison` and `k0_trap` both climb to reflect this.
+  the ~7 wt% sulfur in GPC poisons the Fe catalyst at these low temperatures, and
+  CaO from CaCO₃ is what neutralizes it. There is a **sharp threshold at the ~1:1
+  S:CaCO₃ point** (sub-stoichiometric CaCO₃ fails; at/above ~1:1 it works) — the
+  stoichiometric fingerprint of a trapping sink. The fitted `p_poison` and
+  `k0_trap` both climb to reflect this. *(Specific run values live in the private
+  DATA/ and outputs/, never in committed files.)*
 - **H2 (Boudouard etching) and H3 (dispersion) are NOT identified.** In the fit,
   `alpha_H2` and `h3_gain` rail to their bounds — the classic sign the XRD-only
   data doesn't constrain them (all three hypotheses push XRD ordering the same

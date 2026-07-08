@@ -8,12 +8,17 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# engine + sim + analysis + dashboard + the data needed to generate the page
-COPY engine/ engine/
-COPY sim/ sim/
-COPY analysis/ analysis/
-COPY dashboard/ dashboard/
-COPY DATA/ DATA/
+# Copy the whole build context (.dockerignore excludes .git/.venv/outputs/dist/
+# tests/native/windows/docs/SIMULATION_HANDOFF.md). DATA/ is gitignored so it is
+# only present when the server operator has placed it here; the guard fails with a
+# clear message if it is missing, since the dashboard bakes the real dataset in.
+COPY . .
+RUN test -f "DATA/Yield Data Measurements.xlsx" || { \
+      echo "ERROR: DATA/ is missing from the build context."; \
+      echo "This image bakes your real dataset into the dashboard, so place DATA/"; \
+      echo "(the .xy scans + 'Yield Data Measurements.xlsx') in the repo before"; \
+      echo "building. See the README 'Docker / deploy on your server' section."; \
+      exit 1; }
 
 # regenerate the fit + ground truth, then render the dashboard, so the image is
 # always built from the current model rather than a stale committed artifact.

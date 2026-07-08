@@ -114,21 +114,34 @@ open dashboard/dist/index.html                # (macOS) view locally
 The generated HTML embeds real run compositions, so it's gitignored — share it
 only within the lab.
 
-## Docker (host & share with the lab)
+## Docker / deploy on your server
 
-Serve the dashboard from a container (builds the page at image-build time, serves
-it with nginx on port 8080):
+The container builds the fit + dashboard at image-build time and serves the page
+with nginx on port 8080. **The build needs `DATA/` present in the repo** — it
+bakes your real dataset into the page. `DATA/` and `SIMULATION_HANDOFF.md` are
+gitignored and are **never** pushed to GitHub, so a fresh clone will not have
+them; you add `DATA/` on your server, and the built image (which contains your
+data) stays on your server — never push that image to a public registry.
 
+```bash
+# 1. clone (private repo)
+git clone git@github.com:akvaithi/graphitization-simulation.git
+cd graphitization-simulation
+
+# 2. put your confidential data in place (from your machine / lab store)
+#    the folder must contain the .xy scans + "Yield Data Measurements.xlsx"
+scp -r /path/to/DATA  ./DATA          # or however you move it onto the server
+
+# 3. build + run  ->  http://<server>:8080
+docker compose up --build -d
 ```
-docker compose up --build          # then open http://localhost:8080
-# or without compose:
-docker build -t graphitization-dashboard .
-docker run --rm -p 8080:80 graphitization-dashboard
-```
 
-The build needs `DATA/` present locally (it bakes the real dataset into the page).
-The resulting image is self-contained — share it with the lab via your registry,
-or `docker save` / `docker load` for an offline handoff.
+If `DATA/` is missing the build stops immediately with a message telling you to
+add it. To move the built image between your own machines without rebuilding:
+`docker save graphitization-dashboard | gzip > dash.tgz` → `docker load < dash.tgz`.
+
+> **Repo is private** (pending patent). The committed code carries no real run
+> masses/compositions; keep it private and review before ever making it public.
 
 ## Design notes
 
