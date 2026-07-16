@@ -1,5 +1,6 @@
-# keep the build context small — but DATA/ is intentionally NOT ignored here
-# (the dashboard build bakes it into the page). DATA/ stays gitignored, though.
+# DATA/ is intentionally NOT ignored here (the build bakes it into the page); it
+# stays gitignored so it never reaches GitHub, and the built image goes only to
+# the PRIVATE GHCR package. Keep the rest of the context small.
 .venv/
 .git/
 outputs/

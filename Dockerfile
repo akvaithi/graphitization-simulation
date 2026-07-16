@@ -1,7 +1,9 @@
 # --- stage 1: build the self-contained dashboard HTML ---------------------
-# Needs DATA/ present in the build context (it bakes the real dataset + the
-# engine-fit parameters into the page). DATA/ is gitignored, so build from a
-# working checkout that has it, not from a fresh clone.
+# Bakes the real dataset + the engine-fit into the page, so the resulting image
+# is self-contained (the server just pulls & runs; no DATA needed at runtime).
+# DATA/ is gitignored, so build from a checkout that has it (e.g. your dev
+# machine / lab store), then push to the PRIVATE GHCR package. CI cannot build
+# this image because the repo has no DATA — publishing is a local/scripted step.
 FROM python:3.12-slim AS build
 WORKDIR /app
 
@@ -9,9 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the whole build context (.dockerignore excludes .git/.venv/outputs/dist/
-# tests/native/windows/docs/SIMULATION_HANDOFF.md). DATA/ is gitignored so it is
-# only present when the server operator has placed it here; the guard fails with a
-# clear message if it is missing, since the dashboard bakes the real dataset in.
+# tests/native/windows/docs/SIMULATION_HANDOFF.md, but KEEPS DATA/).
 COPY . .
 RUN test -f "DATA/Yield Data Measurements.xlsx" || { \
       echo "ERROR: DATA/ is missing from the build context."; \

@@ -1,12 +1,17 @@
-# Host the graphitization dashboard for the lab.
-#   docker compose up --build      -> http://localhost:8080
-# Requires DATA/ present locally (the build bakes the real dataset into the page).
+# Graphitization dashboard.
+#
+# On the server (just pull & run the pre-built private image):
+#   echo <TOKEN> | docker login ghcr.io -u akvaithi --password-stdin
+#   docker compose pull && docker compose up -d      ->  http://<server>:8080
+#
+# To (re)publish from a machine that HAS DATA/ (dev box / lab store):
+#   docker compose build      # builds locally, baking DATA/ into the page
+#   docker compose push       # pushes to the private GHCR package
+#   (or run ./scripts/publish.sh, which logs in via `gh` and does both)
 services:
   dashboard:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: graphitization-dashboard
+    image: ghcr.io/akvaithi/graphitization-simulation:latest
+    build: .            # `docker compose build` builds locally (needs DATA/) and tags the image above
     ports:
       - "8080:80"
     restart: unless-stopped

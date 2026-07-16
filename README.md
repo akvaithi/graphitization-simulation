@@ -114,34 +114,39 @@ open dashboard/dist/index.html                # (macOS) view locally
 The generated HTML embeds real run compositions, so it's gitignored — share it
 only within the lab.
 
-## Docker / deploy on your server
+## Docker / deploy from GHCR
 
-The container builds the fit + dashboard at image-build time and serves the page
-with nginx on port 8080. **The build needs `DATA/` present in the repo** — it
-bakes your real dataset into the page. `DATA/` and `SIMULATION_HANDOFF.md` are
-gitignored and are **never** pushed to GitHub, so a fresh clone will not have
-them; you add `DATA/` on your server, and the built image (which contains your
-data) stays on your server — never push that image to a public registry.
+The image is **self-contained** — it bakes the real dataset + the engine fit into
+the static page and serves it with nginx on port 8080, so the server just pulls
+and runs (no `DATA/` needed at runtime). It is published to the **private** GHCR
+package `ghcr.io/akvaithi/graphitization-simulation`.
+
+**On your server** — pull and run:
 
 ```bash
-# 1. clone (private repo)
-git clone git@github.com:akvaithi/graphitization-simulation.git
-cd graphitization-simulation
+# one-time: log in to GHCR (token needs read:packages)
+echo <YOUR_GHCR_TOKEN> | docker login ghcr.io -u akvaithi --password-stdin
 
-# 2. put your confidential data in place (from your machine / lab store)
-#    the folder must contain the .xy scans + "Yield Data Measurements.xlsx"
-scp -r /path/to/DATA  ./DATA          # or however you move it onto the server
-
-# 3. build + run  ->  http://<server>:8080
-docker compose up --build -d
+# then, from a copy of this repo (for compose.yaml) — or use the compose block below
+docker compose pull
+docker compose up -d          # -> http://<server>:8080
 ```
 
-If `DATA/` is missing the build stops immediately with a message telling you to
-add it. To move the built image between your own machines without rebuilding:
-`docker save graphitization-dashboard | gzip > dash.tgz` → `docker load < dash.tgz`.
+**To (re)publish the image** — from a machine that HAS `DATA/` present (dev box /
+lab store), since the image bakes your dataset in and CI has no `DATA/`:
 
-> **Repo is private** (pending patent). The committed code carries no real run
-> masses/compositions; keep it private and review before ever making it public.
+```bash
+./scripts/publish.sh          # logs in via `gh`, builds, and pushes to GHCR
+# (equivalently: docker compose build && docker compose push)
+```
+
+Publishing needs the `write:packages` scope: `gh auth refresh -s write:packages,read:packages`
+once, or set `GHCR_TOKEN` to a PAT with that scope.
+
+> **Both the repo and the GHCR package are private** (pending patent). `DATA/` and
+> `SIMULATION_HANDOFF.md` are gitignored and never reach GitHub; the dataset lives
+> only inside the private image. Keep the package private and never push it to a
+> public registry.
 
 ## Design notes
 
