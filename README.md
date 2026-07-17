@@ -45,9 +45,11 @@ analysis/ground_truth.py  runs the engine on every real scan + joins the weighed
 tests/        pytest suite (ported engine tests + new sim tests)
 ```
 
-`DATA/` (the real XRD scans and the weighed-mass spreadsheet) and
-`SIMULATION_HANDOFF.md` are gitignored — confidential, pending patent. Nothing
-in the committed code hardcodes a real run's mass or composition.
+`DATA/` (the real XRD scans + the weighed-mass spreadsheet) and
+`SIMULATION_HANDOFF.md` are gitignored — they're bulky instrument inputs / a local
+working brief, not secrets. The *derived* results are published in the built page
+(`public/index.html`) and on the live site. Anything that reads DATA (`sim fit`,
+`dashboard/build.py`, the Docker build) only runs where DATA is present.
 
 ## Setup
 
@@ -101,52 +103,42 @@ load-bearing points:
 
 ## Dashboard
 
-`dashboard/build.py` generates a **single self-contained interactive HTML page**
-(`dashboard/dist/index.html`) — real-data panels plus a live, slider-driven port
-of the kinetics ODE (fixed-step RK4, verified against the Python solver). It runs
-entirely in the browser; no server calls.
+**Live: <https://graphitization-simulation.vercel.app>**
 
-```
+`dashboard/build.py` generates a **single self-contained interactive HTML page** —
+real-data panels plus a live, slider-driven port of the kinetics ODE (fixed-step
+RK4, verified numerically identical to the Python solver). It runs entirely in the
+browser; no server calls. The page is deliberately **data + interactive + sources
+only** (no prose), and is pure ASCII so it renders correctly without a charset header.
+
+```bash
 .venv/bin/python dashboard/build.py          # writes dashboard/dist/index.html
 open dashboard/dist/index.html                # (macOS) view locally
 ```
 
-The generated HTML embeds real run compositions, so it's gitignored — share it
-only within the lab.
+## Deploy
 
-## Docker / deploy from GHCR
-
-The image is **self-contained** — it bakes the real dataset + the engine fit into
-the static page and serves it with nginx on port 8080, so the server just pulls
-and runs (no `DATA/` needed at runtime). It is published to the **private** GHCR
-package `ghcr.io/akvaithi/graphitization-simulation`.
-
-**On your server** — pull and run:
+**Vercel (the live site).** `public/index.html` is the committed build that Vercel
+serves; `.vercelignore` ships only `public/` + `vercel.json`. To refresh:
 
 ```bash
-# one-time: log in to GHCR (token needs read:packages)
-echo <YOUR_GHCR_TOKEN> | docker login ghcr.io -u akvaithi --password-stdin
-
-# then, from a copy of this repo (for compose.yaml) — or use the compose block below
-docker compose pull
-docker compose up -d          # -> http://<server>:8080
+.venv/bin/python -m sim fit && .venv/bin/python dashboard/build.py
+cp dashboard/dist/index.html public/index.html
+git add -A && git commit -m "refresh dashboard" && git push
+vercel --prod --yes
 ```
 
-**To (re)publish the image** — from a machine that HAS `DATA/` present (dev box /
-lab store), since the image bakes your dataset in and CI has no `DATA/`:
+**Docker / GHCR (optional, for hosting it internally instead).** The image is
+self-contained — it bakes the dataset + fit into the page and serves it via nginx
+on 8080, so the server just pulls and runs:
 
 ```bash
-./scripts/publish.sh          # logs in via `gh`, builds, and pushes to GHCR
-# (equivalently: docker compose build && docker compose push)
+docker compose pull && docker compose up -d      # -> http://<server>:8080
+./scripts/publish.sh                              # rebuild + push (needs DATA/ + write:packages)
 ```
 
-Publishing needs the `write:packages` scope: `gh auth refresh -s write:packages,read:packages`
-once, or set `GHCR_TOKEN` to a PAT with that scope.
-
-> **Both the repo and the GHCR package are private** (pending patent). `DATA/` and
-> `SIMULATION_HANDOFF.md` are gitignored and never reach GitHub; the dataset lives
-> only inside the private image. Keep the package private and never push it to a
-> public registry.
+Because the image bakes DATA in, it can only be built where `DATA/` exists — CI
+has no DATA, so publishing is a local/scripted step.
 
 ## Design notes
 

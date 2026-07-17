@@ -10,8 +10,11 @@ A simulation of **Fe-catalyzed, CaCO₃-assisted graphitization of green
 petroleum coke (GPC)** into battery-grade graphite at ≤1300 °C. It reconciles a
 mechanistic model against 17 real XRD scans + 6 weighed mass-balance rows, and
 addresses four fronts: (A) mass balance, (B) XRD forward-model/calibration,
-(C) predicted TGA/DTG, (D) CaCO₃ mechanism discrimination (H1/H2/H3). The full
-scientific brief is `SIMULATION_HANDOFF.md` (confidential, gitignored).
+(C) predicted TGA/DTG, (D) CaCO₃ mechanism discrimination (H1/H2/H3). The
+working scientific brief is `SIMULATION_HANDOFF.md` (gitignored — a local
+working doc, not a secret).
+
+**Live site:** <https://graphitization-simulation.vercel.app> (public).
 
 ## Layout & how to run
 
@@ -23,20 +26,39 @@ sim/         the simulation (state, schedule, kinetics ODE, mass balance, xrd
              forward, calibration, tga, hypotheses, inference, __main__ CLI).
 SOURCES.md   every mechanism/assumption -> a citation (for defending to a PI).
 analysis/    ground_truth.py — runs the engine on all real scans + joins masses.
-dashboard/   build.py + template.html -> a self-contained interactive HTML page.
+dashboard/   build.py + template.html -> a self-contained interactive HTML page
+             (dashboard/dist/index.html, gitignored — it is a build artifact).
+public/      the built page, committed, served by Vercel (index.html).
+scripts/     publish.sh — build + push the Docker image to GHCR (optional).
 tests/       pytest suite (engine + research + sim).
-outputs/     generated artifacts (gitignored — derived from confidential DATA/).
+outputs/     generated artifacts (gitignored — regenerate with `sim fit`).
+DATA/        the real scans + mass spreadsheet (gitignored: large/binary inputs,
+             kept out of git; the derived results are public on the live site).
 ```
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m pytest tests/ -q          # 33 pass, 6 skip (no gold/Swift data)
+.venv/bin/python -m pytest tests/ -q          # 40 pass, 6 skip (no gold/Swift data)
 .venv/bin/python -m sim ground-truth          # engine metrics for every DATA/*.xy
 .venv/bin/python -m sim fit                    # re-fit kinetics -> outputs/fitted_params.json
 .venv/bin/python -m sim sweep                  # fitted model across the recipe grid
 .venv/bin/python -m sim ablate --caco3 0.5     # H1/H2/H3 ablation for one recipe
+.venv/bin/python -m sim scaleup                # tube vs kiln x binding x charge
 .venv/bin/python dashboard/build.py            # regenerate the dashboard HTML
 ```
+
+**Publishing the site** (needs `DATA/` present, since the page bakes the data in):
+
+```bash
+.venv/bin/python -m sim fit && .venv/bin/python dashboard/build.py
+cp dashboard/dist/index.html public/index.html
+git add -A && git commit -m "refresh dashboard" && git push
+vercel --prod --yes          # -> https://graphitization-simulation.vercel.app
+```
+
+`.vercelignore` ships only `public/` + `vercel.json` (not DATA/, .venv, code).
+`scripts/publish.sh` + `compose.yaml` are the alternative Docker/GHCR route for
+hosting it internally instead.
 
 Import bootstrap: the engine uses **flat imports**, so `conftest.py` (tests),
 `sim/__init__.py` (sim), and `analysis/ground_truth.py` each put `engine/` and
@@ -154,8 +176,8 @@ ledger.
   CaO from CaCO₃ is what neutralizes it. There is a **sharp threshold at the ~1:1
   S:CaCO₃ point** (sub-stoichiometric CaCO₃ fails; at/above ~1:1 it works) — the
   stoichiometric fingerprint of a trapping sink. The fitted `p_poison` and
-  `k0_trap` both climb to reflect this. *(Specific run values live in the private
-  DATA/ and outputs/, never in committed files.)*
+  `k0_trap` both climb to reflect this. *(Per-run values live in `DATA/`/`outputs/`
+  and are published, derived, on the live site.)*
 - **H2 (Boudouard etching) and H3 (dispersion) are NOT identified.** In the fit,
   `alpha_H2` and `h3_gain` rail to their bounds — the classic sign the XRD-only
   data doesn't constrain them (all three hypotheses push XRD ordering the same
@@ -170,15 +192,24 @@ ledger.
   standard, correcting that scan to 93.3% (matches bench). DG% ≈ 1.4% per 0.01°,
   so this correction is essential.
 
-## Data & confidentiality
+## Data & publishing
 
-- `DATA/` (17 `.xy` scans + `Yield Data Measurements.xlsx`) and
-  `SIMULATION_HANDOFF.md` are **confidential (pending patent 63/704,517)** and
-  **gitignored**. Never commit them, never hardcode a real run's mass or
-  composition into committed code. Example recipes in code/tests use generic
-  round numbers (1.0 / 0.5 / 0.25 g), not the real loadings.
-- `outputs/` and the generated dashboard HTML contain run-derived numbers — also
-  gitignored. The dashboard is safe to share *within the lab* (it's their data).
+**Status: this project is public.** The repo, the built dashboard, and the live
+Vercel site are all public (the work is published; the earlier
+"confidential / pending patent 63/704,517" restriction on the CaCO₃-additive
+specifics no longer gates it). Practical consequences:
+
+- `DATA/` (17 `.xy` scans + `Yield Data Measurements.xlsx`) stays **gitignored** —
+  not for secrecy but hygiene: they are bulky binary/instrument inputs, and the
+  *derived* results are what the site publishes. The dashboard build bakes those
+  derived numbers into `public/index.html`, which **is** committed and public.
+  Anything that needs DATA (`sim fit`, `dashboard/build.py`, the Docker image
+  build) therefore only runs where DATA is present.
+- `SIMULATION_HANDOFF.md` is gitignored as a local working brief.
+- `outputs/` is gitignored — pure build artifacts; regenerate with `sim fit`.
+- Example recipes in code/tests still use generic round numbers
+  (1.0 / 0.5 / 0.25 g) — not for secrecy now, just so tests don't encode one
+  lab run's specifics.
 - Filenames encode the recipe (`2GPC_4Fe_0.5CaCO3_1200C_5H`), parsed by
   `engine/run_parser.py`. **Unlabeled form = puck** (only `powder` is marked);
   `ground_truth.py` fills this in.
@@ -188,16 +219,25 @@ ledger.
 - Fit parameters live in `sim/kinetics.py: Params`; the fitted values are in
   `outputs/fitted_params.json` (regenerate via `python -m sim fit`). The dashboard
   and CLI load fitted values and fall back to `Params()` defaults.
-- The dashboard's JS kinetics is a **line-for-line port** of `sim/kinetics.py`
-  using fixed-step RK4 (`dt = 0.05 min`), verified numerically identical to the
-  Python LSODA reference across the T/CaCO₃ grid. If you change `rhs`, update the
-  JS port in `dashboard/template.html` and re-verify.
+- The dashboard's JS kinetics is a **line-for-line port** of `sim/kinetics.py` +
+  `schedule.py` + `state.py`, using fixed-step RK4 (`dt = 0.1 min`), verified
+  **numerically identical** to the Python LSODA reference across the
+  temperature / CaCO₃ / reactor / geometry / binding / O₂ grid. If you change
+  `rhs`, the schedule, or the state vector, update the JS port in
+  `dashboard/template.html` and re-verify parity before shipping.
+- **The page must stay pure ASCII.** It is served without a guaranteed charset,
+  so non-ASCII bytes render as mojibake. Use HTML entities in markup and
+  `\uXXXX` escapes in JS strings; `python3 -c "…ord(c)>127…"` should report 0.
+- **Dashboard is data + interactive + sources only** — no narrative prose. Charts,
+  controls, stat tiles, and a linked Sources block at the bottom. Keep it that way.
 - **Sources over math when explaining.** The PI weighs citations heavily, so
   documentation and the dashboard justify claims from the literature (SOURCES.md),
   not from the equations. Keep this: when adding a mechanism, add its citation to
   SOURCES.md and reference it, rather than only writing the rate law.
-- Roadmap: the **scale-up front** (rotary kiln, larger charges, pressureless
-  binding methods, O₂) is now in the model as a *predictive* layer awaiting data;
-  more scale-up specifics are forthcoming. The kiln's hold-free profile predicts a
-  large graphitization penalty that better Fe–carbon contact (wet impregnation)
-  and higher Fe partly recover — the main scale-up lever to validate at the bench.
+- Roadmap: the **scale-up front** is in the model as a *predictive* layer with no
+  scale-up data to fit yet — kiln (isothermal hot-zone hold, counter-current O₂
+  gradient, fines constraint), cross-section thermal lag, binding method, O₂.
+  Highest-value validations at the bench: a couple of kiln runs at different
+  **cross-sections** (calibrates `tau_lin`/`tau_quad`), and **CaO-vs-CaCO₃** or a
+  **feed-sulfur sweep** (pins H1 vs H3 quantitatively). The tube-furnace fit is
+  the only data-calibrated part; everything kiln/extruder is extrapolation.
