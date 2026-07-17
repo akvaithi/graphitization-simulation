@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import sim  # noqa: F401
 from sim import feedstock
-from sim.kinetics import Params, Recipe, phase_fractions, simulate
+from sim.kinetics import Params, Recipe, feed_warnings, phase_fractions, simulate
 from sim.state import IDX, carbon_mass, conservation_error, solid_mass
 
 
@@ -44,6 +44,7 @@ def run_mass_balance(recipe: Recipe, p: Params | None = None,
         "post_furnace": float(post_furnace),
         "post_acid": float(post_acid),
         "trapped_metal": float(trapped),
+        "warnings": feed_warnings(recipe),
         "conservation_error": conservation_error(y, y0),
         "solids": {"C_amorphous": float(y[IDX["C_am"]]),
                    "C_turbostratic": float(y[IDX["C_turb"]]),

@@ -90,6 +90,26 @@ def thermal_tau_min(L_mm: float, p: "Params") -> float:
     return p.tau_lin * L_mm + p.tau_quad * L_mm * L_mm
 
 
+# --- scale-up part 3: what the kiln physically cannot be fed ------------------
+# A rotary kiln cannot be fed fines/loose powder: the counter-current flue gas
+# (which exhausts at the feed end) entrains fine particles and carries them out
+# with the exhaust — elutriation (Tackie/UBC 1989; FEECO kiln handbook; lab kiln
+# notes: "fines cannot be put into the kiln"). Kiln feed must be agglomerated —
+# pelletized, extruded, or otherwise bound. This is an operational constraint,
+# not a rate effect, so the model flags it rather than fudging a rate.
+_KILN_AGGLOMERATED = {"pellet", "wet_impregnation", "extrusion"}
+
+
+def feed_warnings(recipe: Recipe) -> list[str]:
+    """Physical-feasibility flags for the chosen reactor + feed form."""
+    w: list[str] = []
+    if recipe.reactor == "kiln" and recipe.binding not in _KILN_AGGLOMERATED:
+        w.append("Fines carryover: a rotary kiln cannot be fed loose powder — the "
+                 "counter-current flue gas elutriates fines out the exhaust. Feed "
+                 "must be agglomerated (pellet / extrudate / impregnated).")
+    return w
+
+
 @dataclass
 class Params:
     """Kinetic parameters. k0 in 1/min (or 1/(g*min) for bimolecular), Ea in J/mol."""
@@ -224,14 +244,18 @@ def rhs(t: float, y: np.ndarray, program: "schedule.TemperatureProgram",
 
     # --- oxygen combustion (only if the atmosphere is not fully inert) --------
     # C + O2 -> CO2. O2 is externally supplied (flowing gas), so first-order in
-    # the reactive carbon and proportional to the O2 fraction; amorphous carbon
-    # burns preferentially (o2_alpha), the same reactivity ordering TGA burn-off
-    # exploits (Lu 2001). Only the carbon mass is booked (the O2 is external), so
-    # the closed-ledger mass balance is preserved.
-    if p.o2_frac > 0.0 and C_tot > 0.0:
+    # the reactive carbon and proportional to the LOCAL O2 fraction; amorphous
+    # carbon burns preferentially (o2_alpha), the same reactivity ordering TGA
+    # burn-off exploits (Lu 2001). Only the carbon mass is booked (the O2 is
+    # external), so the closed-ledger mass balance is preserved.
+    # The kiln is counter-current: O2 is highest at the bottom/burner end, which
+    # is also the hot zone, so the charge meets the most O2 when it is hottest
+    # (program.o2_scale_at; SOURCES.md sec.5). The tube furnace is uniform.
+    o2_here = p.o2_frac * program.o2_scale_at(t)
+    if o2_here > 0.0 and C_tot > 0.0:
         wo_am, wo_turb, wo_gr = p.o2_alpha * C_am, np.sqrt(p.o2_alpha) * C_turb, C_gr
         wo_sum = wo_am + wo_turb + wo_gr
-        r_burn = _arrh(p.k0_o2, p.Ea_o2, T) * p.o2_frac * wo_sum
+        r_burn = _arrh(p.k0_o2, p.Ea_o2, T) * o2_here * wo_sum
         if wo_sum > 0:
             d[IDX["C_am"]] -= r_burn * (wo_am / wo_sum)
             d[IDX["C_turb"]] -= r_burn * (wo_turb / wo_sum)

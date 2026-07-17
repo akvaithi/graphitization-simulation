@@ -137,6 +137,29 @@ def test_material_temperature_lags_gas_for_thick_pieces():
     assert thick["sim"]["T_mat_C"].max() < thin["sim"]["T_mat_C"].max()
 
 
+def test_kiln_o2_is_highest_at_the_hot_end_tube_is_uniform():
+    """Counter-current kiln: air/burner at the bottom (discharge) end and the
+    exhaust leaves the cold top end oxygen-depleted, so O2 rises toward the hot
+    zone -- the charge meets the most O2 when it is hottest. The sealed tube
+    furnace has no such gradient."""
+    from sim.schedule import program_for
+    kiln = program_for("kiln", 1300, 2.0)
+    assert kiln.o2_scale_at(0.0) < 0.05          # cold feed end: O2-depleted
+    assert kiln.o2_scale_at(60.0) > 0.95         # hot zone: O2-rich (burner end)
+    tube = program_for("tube", 1200, 5.0)
+    assert tube.o2_scale_at(0.0) == 1.0 and tube.o2_scale_at(300.0) == 1.0
+
+
+def test_kiln_cannot_be_fed_loose_powder():
+    """Fines are elutriated out of a kiln by the counter-current flue gas, so
+    powder feed is flagged; agglomerated feed is fine, and a tube furnace is
+    unaffected."""
+    from sim.kinetics import feed_warnings
+    assert feed_warnings(Recipe(2, 4, 0.5, 1300, 2, reactor="kiln", binding="dry_mix"))
+    assert not feed_warnings(Recipe(2, 4, 0.5, 1300, 2, reactor="kiln", binding="extrusion"))
+    assert not feed_warnings(Recipe(2, 4, 0.5, 1200, 5, reactor="tube", binding="dry_mix"))
+
+
 def test_o2_burns_carbon_and_conserves_mass():
     """A non-inert atmosphere (o2_frac>0) must lower carbon yield vs pure argon,
     and the carbon-burn ledger must keep total mass conserved."""

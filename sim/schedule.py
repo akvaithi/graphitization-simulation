@@ -42,6 +42,8 @@ class TemperatureProgram:
     t_min: np.ndarray            # breakpoint times (min), ascending, starts at 0
     T_C: np.ndarray              # temperature at each breakpoint (deg C)
     label: str = ""
+    reactor: str = "tube"        # "tube" | "kiln" — drives the O2 profile below
+    peak_C: float = 0.0          # process/peak temperature (for normalizing)
 
     @property
     def total_min(self) -> float:
@@ -54,15 +56,43 @@ class TemperatureProgram:
     def T_K_at(self, t: float) -> float:
         return self.T_C_at(t) + 273.15
 
+    def o2_scale_at(self, t: float) -> float:
+        """Fraction of the nominal O2 the charge is exposed to at time t (0..1).
+
+        **Tube furnace** — a sealed tube under argon; any O2 ingress is uniform,
+        so the scale is 1.0 everywhere.
+
+        **Rotary kiln — counter-current, so O2 is NOT uniform.** The coke is fed
+        at the raised top end and travels down to the discharge end; the
+        natural-gas + air burner fires from the bottom (discharge) end and the
+        flue gas flows counter-current back up, exhausting at the top. Combustion
+        air therefore enters at the bottom and its O2 is progressively consumed
+        burning volatiles as the gas rises, leaving the top (feed/exhaust) end
+        oxygen-depleted: **more O2 at the bottom than the top** (lab kiln notes;
+        pet-coke calcining practice, SOURCES.md sec.5).
+
+        The consequence the model must capture: the bottom is *both* the hot zone
+        *and* the O2-rich end, so the charge meets the most oxygen exactly when it
+        is hottest — the worst case for carbon burn-off. Approximated by scaling
+        O2 with the normalized gas temperature (a proxy for axial position toward
+        the burner).
+        """
+        if self.reactor != "kiln":
+            return 1.0
+        span = max(self.peak_C - T_ROOM_C, 1.0)
+        return min(max((self.T_C_at(t) - T_ROOM_C) / span, 0.0), 1.0)
+
 
 def _segments_to_program(t0: float, T0: float, segments: list[tuple[float, float]],
-                         label: str) -> TemperatureProgram:
+                         label: str, reactor: str = "tube",
+                         peak_C: float = 0.0) -> TemperatureProgram:
     """segments = [(duration_min, T_end_C), ...] appended after (t0, T0)."""
     ts, Ts = [t0], [T0]
     for dur, T_end in segments:
         ts.append(ts[-1] + dur)
         Ts.append(T_end)
-    return TemperatureProgram(np.asarray(ts, float), np.asarray(Ts, float), label)
+    return TemperatureProgram(np.asarray(ts, float), np.asarray(Ts, float), label,
+                              reactor, peak_C)
 
 
 def tube_furnace_program(peak_C: float, hold_h: float, *,
@@ -97,7 +127,8 @@ def tube_furnace_program(peak_C: float, hold_h: float, *,
     segs.append((abs(peak_C - cool_to_C) / ramp_C_per_min, cool_to_C))
     segs.append((natural_cool_min, T0_C))
     return _segments_to_program(0.0, T0_C, segs,
-                                f"tube: peak {peak_C:.0f}C, hold {hold_h:.2g}h")
+                                f"tube: peak {peak_C:.0f}C, hold {hold_h:.2g}h",
+                                reactor="tube", peak_C=peak_C)
 
 
 def rotary_kiln_program(peak_C: float, residence_h: float, *,
@@ -121,7 +152,8 @@ def rotary_kiln_program(peak_C: float, residence_h: float, *,
                                 [(min(entry_min, residence_min), peak_C),
                                  (hold, peak_C),
                                  (exit_min if hold > 0 else 0.0, T0_C)],
-                                f"kiln: peak {peak_C:.0f}C, residence {residence_h:.2g}h")
+                                f"kiln: peak {peak_C:.0f}C, residence {residence_h:.2g}h",
+                                reactor="kiln", peak_C=peak_C)
 
 
 def program_for(reactor: str, peak_C: float, time_h: float, **kw) -> TemperatureProgram:

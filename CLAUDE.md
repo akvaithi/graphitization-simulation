@@ -60,6 +60,22 @@ Two reactor modes, both full multi-segment programs (piecewise-linear T(t)):
   pass graphitizes well (~90% at lab cross-section) — the kiln is viable; the
   scale penalty comes from cross-section, not the reactor. *(An earlier version
   wrongly modeled the kiln as a hold-free triangle; corrected per lab feedback.)*
+- **Kiln geometry is counter-current** (from the lab's kiln notes), and two
+  consequences are modeled:
+  1. **O₂ is not uniform.** Coke feeds in at the raised top end and travels down
+     to the **burner (natural gas + air) at the bottom/discharge end**; the flue
+     gas flows counter-current back up and exhausts at the top, its O₂ consumed
+     on the way. So **more O₂ at the bottom than the top** — and the bottom is
+     *also* the hot zone, so the charge meets the most oxygen exactly when it is
+     hottest (worst case for burn-off). `schedule.TemperatureProgram.o2_scale_at`
+     scales O₂ with the normalized gas temperature (a proxy for axial position);
+     the tube furnace is uniform (`scale = 1`).
+  2. **Fines cannot be fed.** The counter-current gas elutriates fine particles
+     out the exhaust, so kiln feed **must be agglomerated** (pellet / extrudate /
+     impregnated). `kinetics.feed_warnings` flags `reactor="kiln"` +
+     `binding="dry_mix"`. This is an operational constraint (a flag), not a rate
+     term — and it is an independent reason the **extruder** route is the scale-up
+     path, on top of the cross-section/heat-transfer argument.
 
 ### Material thermal lag (`sim/kinetics.py`, the heat-transfer model)
 The **gas** follows the program above; the **material** lags it by a lumped-

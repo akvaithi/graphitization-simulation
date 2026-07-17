@@ -358,6 +358,7 @@
               <button data-val="extrusion" aria-pressed="false">Extrude</button>
               <button data-val="dry_mix" aria-pressed="false">Dry mix</button>
             </div>
+            <div class="limit-note" id="fines-note" style="color:var(--critical)">Fines carryover: a kiln can't be fed loose powder &mdash; the counter-current flue gas blows fines out the exhaust. Feed must be agglomerated.</div>
           </div>
           <div class="control">
             <label>O&#8322; in atmosphere <span class="val"><span id="v-o2">0.0</span>&nbsp;%</span></label>
@@ -483,7 +484,8 @@
       <div class="card">
         <div class="card-title">Scale-up: kiln, heat transfer</div>
         <ul class="src-list">
-          <li><a href="https://kintekfurnace.com/faqs/what-are-the-zones-inside-the-rotary-kiln-cylinder" target="_blank" rel="noopener">Rotary-kiln zones</a> &mdash; heat &rarr; isothermal hold (hot-zone) &rarr; cool.</li>
+          <li><a href="https://kintekfurnace.com/faqs/what-are-the-zones-inside-the-rotary-kiln-cylinder" target="_blank" rel="noopener">Rotary-kiln zones</a> &mdash; heat &rarr; isothermal hold (hot-zone) &rarr; cool. Counter-current: burner at the bottom/discharge end, exhaust at the top, so O&#8322; is highest at the hot end.</li>
+          <li><a href="https://onlinelibrary.wiley.com/doi/abs/10.1002/cjce.5450670512" target="_blank" rel="noopener">Elutriation from rotary kilns (1989)</a> &mdash; fines are blown out the exhaust, so kiln feed must be agglomerated (extrudate/pellet).</li>
           <li><a href="https://link.springer.com/content/pdf/10.1007/978-3-319-48245-3_24.pdf" target="_blank" rel="noopener">Pet-coke thermo-physical, <i>Springer</i> (2016)</a> &mdash; raw coke k&nbsp;&asymp;&nbsp;2&ndash;4&nbsp;W/m&middot;K (thermal lag by cross-section).</li>
           <li><a href="https://www.qfindustrial.com/news/graphitization-is-a-core-step-in-the-production-process-in-what-equipment-is-it-usually-carried-out/" target="_blank" rel="noopener">Industrial graphitization</a> &mdash; continuous furnaces vs batch Acheson.</li>
         </ul>
@@ -564,14 +566,14 @@ function arrh(k0, Ea, T){ return k0*Math.exp(-Ea/(R_GAS*T)); }
 
 // --- temperature program (sim/schedule.py) --------------------------------
 function _programBreakpoints(reactor, peakC, timeH){
-  // returns {t:[min], T:[degC]} piecewise-linear GAS breakpoints
+  // returns {t:[min], T:[degC], reactor, peakC} piecewise-linear GAS breakpoints
   if(reactor==="kiln"){
     // rotary kiln: short heated entry -> isothermal hold (hot-zone traverse) -> short cool exit
     const res = timeH*60;
     const hold = Math.max(0, res - KILN_ENTRY_MIN - KILN_EXIT_MIN);
-    if(hold <= 0){ return {t:[0, Math.min(KILN_ENTRY_MIN,res)], T:[T_ROOM_C, peakC]}; }
+    if(hold <= 0){ return {t:[0, Math.min(KILN_ENTRY_MIN,res)], T:[T_ROOM_C, peakC], reactor:reactor, peakC:peakC}; }
     return {t:[0, KILN_ENTRY_MIN, KILN_ENTRY_MIN+hold, KILN_ENTRY_MIN+hold+KILN_EXIT_MIN],
-            T:[T_ROOM_C, peakC, peakC, T_ROOM_C]};
+            T:[T_ROOM_C, peakC, peakC, T_ROOM_C], reactor:reactor, peakC:peakC};
   }
   // tube furnace: preheat holds below peak, process hold, programmed + natural cool
   const t=[0], T=[T_ROOM_C]; let prevT=T_ROOM_C, first=true;
@@ -587,7 +589,17 @@ function _programBreakpoints(reactor, peakC, timeH){
   t.push(t[t.length-1]+timeH*60); T.push(peakC);  // process hold
   t.push(t[t.length-1]+Math.abs(peakC-COOL_TO_C)/RAMP_C_PER_MIN); T.push(COOL_TO_C); // programmed cool
   t.push(t[t.length-1]+NATURAL_COOL_MIN); T.push(T_ROOM_C);  // natural cool
-  return {t, T};
+  return {t, T, reactor:reactor, peakC:peakC};
+}
+// Counter-current kiln: coke feeds in at the top and travels down to the burner
+// at the bottom; combustion air enters there and its O2 is consumed as the flue
+// gas rises to the top exhaust -- so O2 is highest at the bottom, which is also
+// the hot zone. The charge therefore meets the most O2 when it is hottest. Tube
+// furnace (sealed, argon) is uniform. Mirrors sim/schedule.py: o2_scale_at.
+function _o2ScaleAt(prog, tMin){
+  if(prog.reactor !== "kiln") return 1.0;
+  const span = Math.max(prog.peakC - T_ROOM_C, 1.0);
+  return Math.min(Math.max((_interpT(prog, tMin) - T_ROOM_C)/span, 0), 1);
 }
 function _interpT(prog, tMin){
   const t=prog.t, T=prog.T, n=t.length;
@@ -665,11 +677,13 @@ function rhs(t, y, prog, p, h1, h2, h3, contact, tau, out){
   out[IDX.C_gr] += r_tg;
   out[IDX.Q] = p.q_gain*k_g*(1.0 - Math.min(y[IDX.Q],1.0));
 
-  // oxygen combustion (only if atmosphere is not fully inert)
-  if(p.o2_frac > 0 && C_tot > 0){
+  // oxygen combustion (only if atmosphere is not fully inert). The kiln's O2 is
+  // counter-current: highest at the bottom/burner end, which is also the hot zone.
+  const o2_here = p.o2_frac * _o2ScaleAt(prog, t);
+  if(o2_here > 0 && C_tot > 0){
     const wo_am=p.o2_alpha*C_am, wo_turb=Math.sqrt(p.o2_alpha)*C_turb, wo_gr=C_gr;
     const wo_sum=wo_am+wo_turb+wo_gr;
-    const r_burn = arrh(p.k0_o2,p.Ea_o2,T)*p.o2_frac*wo_sum;
+    const r_burn = arrh(p.k0_o2,p.Ea_o2,T)*o2_here*wo_sum;
     if(wo_sum>0){
       out[IDX.C_am] -= r_burn*(wo_am/wo_sum);
       out[IDX.C_turb] -= r_burn*(wo_turb/wo_sum);
@@ -1043,6 +1057,8 @@ function renderAll(){
   els.vo2.textContent = fmt(params.o2_frac*100,1);
   document.getElementById('lab-time').textContent = isKiln ? 'Residence time' : 'Hold time';
   document.getElementById('kiln-note').classList.toggle('show', isKiln);
+  // a kiln cannot be fed loose powder (fines are elutriated out the exhaust)
+  document.getElementById('fines-note').classList.toggle('show', isKiln && bindingVal === 'dry_mix');
   document.getElementById('prog-sub').innerHTML = isKiln
     ? 'Rotary kiln: fast entry &rarr; <b>isothermal hold</b> (hot-zone traverse) &rarr; fast cool. Grey = gas; ember = material (lags by its thermal time constant).'
     : 'Tube furnace: preheat holds &rarr; process hold &rarr; cooling. Grey = gas; ember = material.';

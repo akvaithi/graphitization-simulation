@@ -121,6 +121,24 @@ assumption]** for the exact functional form.
   rotary kilns," *Powder Technol.* (2009)
   <https://www.sciencedirect.com/science/article/abs/pii/S0255270109000063> —
   residence-time behavior in carbon rotary kilns.
+- **Counter-current geometry + O₂ gradient** (the lab's own kiln, meeting notes;
+  consistent with pet-coke calciner practice
+  <https://patents.google.com/patent/CN201104098Y/en>): coke feeds at the raised
+  **top** end and travels **down** to the **burner (natural gas + air) at the
+  bottom/discharge** end; flue gas flows counter-current up and **exhausts at the
+  top**, its O₂ consumed en route — so **more O₂ at the bottom than at the top**.
+  Because the bottom is *also* the hot zone, the charge sees maximum O₂ at maximum
+  temperature. Modeled by `schedule.TemperatureProgram.o2_scale_at`.
+  **[modeling assumption]** for using normalized gas temperature as the axial
+  proxy.
+- **Fines cannot be fed to a kiln** — "Experimental study of the elutriation of
+  particles from rotary kilns," *Can. J. Chem. Eng.* (1989)
+  <https://onlinelibrary.wiley.com/doi/abs/10.1002/cjce.5450670512>; FEECO rotary
+  kiln handbook <https://feeco.com/wp-content/uploads/2022/07/The-FEECO-Rotary-Kiln-Handbook.pdf>
+  — fines entrain in the counter-current gas and are carried out the exhaust
+  (elutriation rate scales ~v^4.6 with gas velocity), so kiln feed must be
+  agglomerated. Backs `kinetics.feed_warnings` and is an independent argument for
+  the extruder route.
 - **Carbon heat transfer** — "Thermo-Physical Properties of Petroleum Coke during
   Calcining/Graphitization," *Springer* (2016)
   <https://link.springer.com/content/pdf/10.1007/978-3-319-48245-3_24.pdf> — raw
